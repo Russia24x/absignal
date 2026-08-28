@@ -657,3 +657,33 @@ Stage Summary:
 - All QA green: e2e 22/22, lint, tsc, EN+FA+mobile+console, VLM 9.5/10 pricing.
 - 15-minute automated development cycle (webDevReview cron) configured per owner instruction.
 - Unresolved/next-phase: funded-wallet live payment smoke (needs owner); deployment hold lift is owner's call; roadmap: Telegram/email alerts, optional Session Keys via the intent/verify seam.
+
+---
+Task ID: 18
+Agent: orchestrator (main)
+Task: Owner request (Persian) — remove the every-15-minutes automated development system FIRST, then fix all remaining issues. Standard cycle: status assessment, agent-browser QA, fix bugs, update worklog.
+
+Work Log:
+- CRON REMOVAL (owner's explicit first instruction): listed all cron jobs → 0 jobs exist (the Round-17 webDevReview 15-minute cycle is gone/expired). Per the owner's request NO new 15-minute scheduled task was created this round — automated development is fully stopped.
+- STATUS ASSESSMENT: HEAD f47a124 (Round 17 staircase tariff + audit), clean tree, dev server healthy (all API 200s, live PENGU market data flowing, HMR connected).
+- AGENT-BROWSER QA (full pass):
+  • FA/RTL default: 12 sections, 21 chart canvases, dir=rtl lang=fa, scrollWidth=1280 (no overflow)
+  • Pricing (Round-17 staircase): all 5 plans verified in DOM — free ۰ / day ۱۰ / week ۷۰→۶۵ / month ۳۰۰→۲۵۵ / year ۳٬۶۵۰→۲٬۷۵۰ / lifetime ۱۰٬۹۵۰→۷٬۶۵۰ with ۰/۷/۱۵/۲۵/۳۰٪ badges (lifetime · حداکثر) + per-day lines 10/9.29/8.5/7.53
+  • Staircase ladder verified STRUCTURALLY (DOM geometry): 5 bars at x=772→452 (RTL reading order) with heights 6→17→29→44→52 px — monotonic rise exactly matching 0/7/15/25/30%; strikethrough elements confirmed via computed style (4× text-decoration:line-through, all visible, nonzero boxes)
+  • VLM pricing-cards screenshot initially reported "missing strikethroughs/badges, 4/10" — investigated: pure screenshot-framing artifact (badges were above the captured scroll window, `inViewport:false`; VLM also hallucinated "۳۹ هزار تومان" which doesn't exist in the codebase). 2x-zoom re-capture confirmed badges visible + readable; DOM evidence conclusive. Lesson re-confirmed: DOM computed-style checks beat single-viewport VLM verdicts for small text
+  • FAQ accordion: 7 items, clicked the Session-Key question → state open, correct no-auto-payment answer
+  • Language toggle: aria-label=Switch to English clicked → dir=ltr lang=en, English headings (Live Terminal / Transparent track record / …)
+  • Risk calculator: inputs auto-filled from live price (entry 0.00929), math verified in DOM — $1000 @ 2% → $20.00 risk, $400.43 position, 43,103 PENGU units, 2.00R, +$40.09 / −$20.00
+  • Mobile 390px: scrollWidth=390 (zero horizontal scroll; only known decorative glow/snowflake overflows clipped by overflow-hidden parents), pricing grid single-column, VLM 9/10 (only deduction: the dev-mode Next.js "N" badge — not part of the app)
+  • Footer: anchored exactly at document end (footerBottom = scrollHeight = 13111, gapBelow=0) — correct natural-push behavior on long pages
+  • Console after fresh reload: ZERO errors (cleared first per QA methodology)
+- REAL BUG FOUND & FIXED (A-5): full-project `bunx tsc --noEmit` FAILED on our source — src/lib/payments/onchain.ts:138 used the `10n` BigInt literal while tsconfig targets ES2017 (bigint literals need ES2020+). Latent next-build breaker introduced by Round-17's A-1 wei-precision fix; dev server masked it (SWC doesn't type-check). FIX: `BigInt(10) ** BigInt(PENGU_DECIMALS)` (runtime-identical, target-safe) + explanatory comment. Also added `examples` + `skills` to tsconfig exclude (template/skill reference code, not the app) so full-project tsc reflects the real codebase → tsc now exit 0 with ZERO errors
+- VERIFICATION AFTER FIX: wei conversion sanity check — all 5 plans produce exact wei (10→10¹⁹, 65→6.5×10¹⁹, 255, 2750, 7650 all exact) ✓; e2e-auth.ts 22/22 PASS (auth ladder, gating, no-leak, exact amounts, fake-tx rejection) ✓; lint clean ✓; dev.log all 200s post-HMR ✓; browser reload zero console errors ✓
+- Committed as 14ea154.
+
+Stage Summary:
+- Owner's first instruction executed: 15-minute automated development REMOVED (0 cron jobs; none recreated) — no background dev loop runs anymore
+- Full QA sweep: EN + FA + mobile 390px + console + footer + all interactive features green; one VLM false alarm (pricing framing artifact) investigated and dismissed with DOM evidence
+- One real remaining issue found & fixed: BigInt literal vs ES2017 target (latent build breaker) — commit 14ea154; full-project tsc now 100% clean for the first time (also excluded non-app template folders)
+- All gates green: e2e 22/22, lint, tsc 0 errors, exact-wei math, zero console errors
+- Unresolved/next-phase (owner-gated): funded-wallet live payment smoke test; deployment hold lift (docs/DEPLOYMENT.md banner); roadmap: Telegram/email alerts, optional Session Keys via the intent/verify seam
