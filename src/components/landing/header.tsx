@@ -39,7 +39,8 @@ export function Header() {
   return (
     <header
       className={cn(
-        'fixed top-0 inset-x-0 z-50 transition-all duration-300',
+        'fixed inset-x-0 z-50 transition-all duration-300',
+        'top-0 sm:top-9', // sm+: pushed below the LivePriceTicker (h-9); mobile: top of viewport (ticker hidden)
         scrolled ? 'glass-strong shadow-lg shadow-black/20' : 'bg-transparent'
       )}
     >

@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { useI18n } from '@/lib/i18n/context'
 import { useCandles } from '@/hooks/use-app-data'
+import { OscillatorsPanel } from '@/components/market/oscillators-panel'
 import { cn } from '@/lib/utils'
 
 const TIMEFRAMES = ['15m', '1h', '4h', '1d'] as const
@@ -269,6 +270,10 @@ export function PriceChart() {
             <span className="h-0.5 w-4 rounded-full bg-[#b48cff]" aria-hidden />
             {t.market.ema50}
           </button>
+        </div>
+        {/* RSI + MACD subpanels — share the same tf as the main chart */}
+        <div className="mt-4">
+          <OscillatorsPanel tf={tf} />
         </div>
       </CardContent>
     </Card>

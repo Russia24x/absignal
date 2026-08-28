@@ -56,6 +56,28 @@ export const dict = {
       ema20: 'EMA 20',
       ema50: 'EMA 50',
       staleData: 'Cached — data source limited',
+      oscillatorsTitle: 'Momentum oscillators',
+      rsiTitle: 'RSI (14)',
+      rsiOverbought: 'Overbought',
+      rsiOversold: 'Oversold',
+      rsiNeutral: 'Neutral',
+      rsiValue: 'RSI',
+      macdTitle: 'MACD (12 / 26 / 9)',
+      macdLine: 'MACD line',
+      macdSignal: 'Signal',
+      macdHistogram: 'Histogram',
+      bullHist: 'Bullish histogram',
+      bearHist: 'Bearish histogram',
+    },
+
+    // Live price ticker strip (sticky top)
+    ticker: {
+      liveLabel: 'LIVE',
+      priceLabel: 'PENGU',
+      volLabel: 'Vol',
+      change24h: '24h',
+      scrollHint: 'View terminal',
+      stale: 'cached',
     },
 
     // Market sentiment gauge
@@ -366,6 +388,29 @@ export const dict = {
       features: 'Why PenguSignal',
       pricing: 'Pricing',
       faq: 'Answers',
+      holderPerks: 'For PENGU holders',
+    },
+
+    // Holder Perks — landing section between Pricing and FAQ
+    holderPerks: {
+      title: 'Hold more PENGU, unlock more signal',
+      subtitle:
+        'The treasury grows with the community. Anyone holding PENGU in their connected wallet gets layered benefits on top of the standard day-pass — no extra cost, no lockup, fully on-chain verifiable.',
+      badgeLabel: 'Holder perk',
+      ctaTitle: 'Already holding?',
+      ctaDesc: 'Connect your wallet — perks activate automatically when your PENGU balance is detected.',
+      ctaButton: 'Connect & check',
+      perk1Title: 'Free daily preview',
+      perk1Desc: 'Holders see a free high-level verdict (BUY / HOLD / SELL) every day before paying for the full report.',
+      perk2Title: 'Discounted day-pass',
+      perk2Desc: 'Pay 0.5 PENGU instead of 1 PENGU per day — half-price for any wallet that holds PENGU above the holder threshold.',
+      perk3Title: 'Members-only alpha',
+      perk3Desc: 'Mid-day re-evaluation when the 4h trend flips. Holders get an alert-style update before the next daily lock.',
+      perk4Title: 'Treasury rebates',
+      perk4Desc: 'A share of every paid signal flows back to long-term holders via seasonal on-chain distributions (roadmap).',
+      thresholdLabel: 'Holder threshold',
+      thresholdValue: '1,000 PENGU',
+      tooltipText: 'Verified live against your wallet PENGU balance on Abstract.',
     },
 
     // Common
@@ -454,6 +499,28 @@ export const dict = {
       ema20: 'EMA ۲۰',
       ema50: 'EMA ۵۰',
       staleData: 'کش‌شده — منبع داده محدود شده',
+      oscillatorsTitle: 'اسیلاتورهای مومنتوم',
+      rsiTitle: 'RSI (۱۴)',
+      rsiOverbought: 'اشباع خرید',
+      rsiOversold: 'اشباع فروش',
+      rsiNeutral: 'خنثی',
+      rsiValue: 'RSI',
+      macdTitle: 'MACD (۱۲ / ۲۶ / ۹)',
+      macdLine: 'خط MACD',
+      macdSignal: 'سیگنال',
+      macdHistogram: 'هیستوگرام',
+      bullHist: 'هیستوگرام صعودی',
+      bearHist: 'هیستوگرام نزولی',
+    },
+
+    // نوار قیمت لحظه‌ای (چسبانده‌شده در بالا)
+    ticker: {
+      liveLabel: 'زنده',
+      priceLabel: 'پنگو',
+      volLabel: 'حجم',
+      change24h: '۲۴ساعت',
+      scrollHint: 'مشاهده ترمینال',
+      stale: 'کش‌شده',
     },
 
     // شاخص احساسات بازار
@@ -756,6 +823,29 @@ export const dict = {
       features: 'چرا پنگوسیگنال',
       pricing: 'تعرفه',
       faq: 'پاسخ‌ها',
+      holderPerks: 'برای دارندگان پنگو',
+    },
+
+    // مزایای دارندگان پنگو — بخش بین تعرفه و سؤالات متداول
+    holderPerks: {
+      title: 'پنگوی بیشتر نگه‌دار، سیگنال بیشتر بگیر',
+      subtitle:
+        'خزانه پروژه با جامعه رشد می‌کند. هر کس که پنگو در کیف پول وصل‌شده‌اش داشته باشد، مزایای لایه‌لایه روی پاس روزانه استاندارد دریافت می‌کند — بدون هزینه اضافه، بدون قفل، کاملاً قابل ممیزی روی زنجیره.',
+      badgeLabel: 'مزیت دارنده',
+      ctaTitle: 'از قبل پنگو دارید؟',
+      ctaDesc: 'کیف پول را وصل کنید — با تشخیص موجودی پنگوی شما، مزایا به‌صورت خودکار فعال می‌شوند.',
+      ctaButton: 'اتصال و بررسی',
+      perk1Title: 'پیش‌نمایش روزانه رایگان',
+      perk1Desc: 'دارندگان هر روز قبل از پرداخت برای گزارش کامل، یک رأی سطح‌بالا (خرید / نگه‌داری / فروش) به‌صورت رایگان می‌بینند.',
+      perk2Title: 'پاس روزانه با تخفیف',
+      perk2Desc: 'به‌جای ۱ پنگو، ۰٫۵ پنگو در روز پرداخت کنید — نصف‌قیمت برای کیف پولی که پنگوی بالای آستانه دارنده داشته باشد.',
+      perk3Title: 'آلفای اعضای ویژه',
+      perk3Desc: 'ارزیابی مجدد وسط روز وقتی روند ۴ساعته برگردد. دارندگان قبل از قفل روز بعد، یک هشدار به‌روزرسانی دریافت می‌کنند.',
+      perk4Title: 'تخفیف‌های خزانه',
+      perk4Desc: 'سهمی از هر سیگنال پولی به دارندگان بلندمدت از طریق توزیع‌های فصلی روی زنجیره برمی‌گردد (نقشه‌راه).',
+      thresholdLabel: 'آستانه دارنده',
+      thresholdValue: '۱٬۰۰۰ پنگو',
+      tooltipText: 'به‌صورت زنده در برابر موجودی پنگوی کیف پول شما روی Abstract بررسی می‌شود.',
     },
 
     common: {

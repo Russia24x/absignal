@@ -43,9 +43,21 @@ export function Hero() {
               className="text-4xl sm:text-5xl lg:text-6xl font-black leading-[1.15] tracking-tight"
             >
               {t.heroTitle1}{' '}
-              <span className="text-bull">{t.heroTitleBuy}</span>{' '}
+              <span className="relative inline-block text-bull text-glow-bull">
+                {t.heroTitleBuy}
+                <span
+                  aria-hidden
+                  className="absolute -inset-x-2 -inset-y-1 -z-10 rounded-xl bg-bull/15 blur-xl"
+                />
+              </span>{' '}
               <span className="text-muted-foreground font-bold text-3xl sm:text-4xl lg:text-5xl">{t.heroTitleOr}</span>{' '}
-              <span className="text-bear">{t.heroTitleSell}</span>{' '}
+              <span className="relative inline-block text-bear text-glow-bear">
+                {t.heroTitleSell}
+                <span
+                  aria-hidden
+                  className="absolute -inset-x-2 -inset-y-1 -z-10 rounded-xl bg-bear/15 blur-xl"
+                />
+              </span>{' '}
               <span className="text-gradient-frost">{t.heroTitle2}</span>
             </motion.h1>
 

@@ -297,3 +297,51 @@ Stage Summary:
 - New public feature shipped: Backtest Sandbox — deterministic, no-look-ahead 1D engine replay with conservative assumptions (stop-first, non-overlapping, edge-excluded), full EN/FA + RTL + mobile, honest +1.92R/15-trade result displayed with educational disclaimer
 - Styling mandate satisfied: gradient stat cards, animated step-equity curve with hover tooltips, themed slim scrollbars, outcome badges
 - Unresolved/next-phase items: 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) backtest currently 1D-only (intraday history unavailable) — documented honestly in UI; 4) optional roadmap: Telegram/email alerts for subscribers, session-key auto-renew only if product justifies security review
+
+---
+Task ID: 10
+Agent: Main Agent (Z.ai Code)
+Task: Round 10 (cron review cycle) — status assessment, agent-browser QA sweep, 3 new features (Live Price Ticker, RSI/MACD Oscillators, Holder Perks section) + styling polish (hero gradient glows, AnimatedNumber component)
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: local == remote == 2dc26b5, clean → proceeded
+- STATUS ASSESSMENT (agent-browser): page loads clean, no console errors, all rounds 1-9 features intact (Backtest Sandbox, Abstract Profile treasury identity, wallet gate unavailable-state, etc.). Real market data flowing. RTL/LTR switch works. No bugs found → proceeded to new-feature work per cron mandate
+- NEW FEATURE 1 — Live Price Ticker sticky strip (src/components/landing/live-ticker.tsx):
+  • Fixed top-of-page (z-55, h-9 = 36px) thin strip showing: LIVE pulse, PENGU price ($0.00933), 24h % change (color-coded), volume, mini 30-bar SVG sparkline with last-point dot, "VIEW TERMINAL →" hint. Click → smooth scroll to #app
+  • Hidden on mobile (`hidden sm:block`) to keep mobile header uncluttered — hero ticker still surfaces the same data on small screens
+  • Header pushed below on sm+ (`sm:top-9`); stays at top-0 on mobile (no ticker above)
+  • Reuses useMarketOverview (45s) + useCandles('1h') — no new endpoint, zero marginal upstream cost
+  • Top aurora hairline + hover border accent; sparkline color follows sign (bull #3ddc97 / bear #ff6b7a) with area fill at 0.15 opacity
+- NEW FEATURE 2 — RSI + MACD Oscillators panel (src/components/market/oscillators-panel.tsx):
+  • Two small (h-120px) lightweight-charts canvases below the main price chart, sharing the parent chart's tf via prop
+  • RSI(14) — Wilder smoothing, purple line, dashed price-lines at 30 (oversold, green) / 70 (overbought, red) / 50 (mid, dotted subtle). Badge shows latest RSI value with state-coloured background (overbought/oversold/neutral)
+  • MACD(12/26/9) — histogram bars colored by sign (bull green / bear red), MACD line (cyan), Signal line (orange). Zero baseline dotted. Badge shows latest histogram value with sign prefix and color
+  • Bug fix during QA: initial conditional-render of chart containers (Skeleton when isLoading) caused refs to be null at createChart effect time → charts never created. Restructured to always render the containers and overlay the Skeleton on top (opacity transition). Verified: canvas count went 7 → 21, both oscillator charts now visibly render
+  • Math: rsiWilder, emaArr, macd helpers — same algorithm as the engine's sentiment components (kept consistent)
+  • i18n: 12 new keys en+fa in dict.ts market.* (oscillatorsTitle, rsiTitle, rsiOverbought/Oversold/Neutral, rsiValue, macdTitle, macdLine/Signal/Histogram, bullHist/bearHist)
+- NEW FEATURE 3 — Holder Perks landing section (src/components/landing/holder-perks.tsx):
+  • New section id="perks" between Pricing and FAQ in page.tsx
+  • 4 perk cards (Eye / Percent / BellRing / Gift icons) describing layered PENGU-holder benefits: free daily preview, discounted day-pass (0.5 PENGU), members-only mid-day alpha, treasury rebates (roadmap)
+  • Threshold pill with ShieldCheck icon ("Holder threshold: 1,000 PENGU") + tooltip explaining live on-chain verification
+  • Bottom CTA card with Wallet icon → "Already holding? Connect your wallet" + button "Connect & check" → scrolls to #app
+  • Ambient glow orb (bg-primary/5 blur-[140px]); added overflow-hidden to section after mobile QA found 640px-wide orb caused horizontal overflow on 390px viewport
+- STYLING POLISH:
+  • Hero verdict words BUY (green) / SELL (red) now have per-color text-glow + ambient backdrop blur (text-glow-bull / text-glow-bear utilities in globals.css + text-glow-pulse keyframe)
+  • New AnimatedNumber component (src/components/landing/animated-number.tsx) — count-up via IntersectionObserver + requestAnimationFrame, easeOutExpo, prefers-reduced-motion respected (snaps to value, no animation)
+  • All setState calls happen inside IntersectionObserver callbacks (async) to satisfy react-hooks/set-state-in-effect rule (initial attempt was a lint error)
+- i18n: 40+ new keys en+fa (ticker.*, market.oscillators/MACD/RSI keys, eyebrow.holderPerks, holderPerks.* section)
+- QA (agent-browser, all green):
+  1. Desktop EN: page loads, 9 sections render, ticker visible at top, header below (no overlap), oscillators panel shows RSI purple line + 30/70 dashed refs, MACD histogram + 2 lines + colored badges; hero BUY/SELL glow visible; holder perks 4 cards + threshold pill + CTA card all render
+  2. Desktop FA: same content Persian, RTL mirrored, ticker in Persian ("زنده / پنگو / حجم / مشاهده ترمینال"), holder perks heading "پنگوی بیشتر نگه‌دار، سیگنال بیشتر بگیر" visible
+  3. Mobile 390px (CDP Emulation.setDeviceMetricsOverride): no horizontal overflow (after fixing the ambient-glow overflow), 4 perk cards stack vertically, all elements readable
+  4. Console: zero errors, zero warnings from our app code
+  5. lint clean, tsc src/ 0 errors
+  6. VLM visual reviews passed on ticker, oscillators, holder perks, hero, mobile
+- INFRA NOTE: agent-browser doesn't expose a viewport command on Linux (device list requires Xcode). Worked around by talking CDP directly (Target.attachToTarget → Emulation.setDeviceMetricsOverride) via a small bun script
+
+Stage Summary:
+- Status assessment: stable, no bugs across rounds 1-9 — proceeded to new features per cron mandate
+- Three new user-visible features shipped: Live Price Ticker (always-on market awareness), RSI/MACD Oscillators (free TA depth preview), Holder Perks (PENGU-token adoption funnel)
+- Styling polish: hero verdict words now glow per-color, AnimatedNumber component ready for future stat counters
+- All QA green: EN+FA+mobile+lint+tsc, zero console errors
+- Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) optional roadmap: Telegram/email alerts for subscribers, session-key auto-renew only if product justifies mainnet security review

@@ -210,6 +210,17 @@
   .text-glow {
     text-shadow: 0 0 22px rgba(123, 225, 255, 0.45);
   }
+  /* Per-color text glows for hero verdict words */
+  .text-glow-bull {
+    text-shadow: 0 0 18px rgba(61, 220, 151, 0.45), 0 0 40px rgba(61, 220, 151, 0.15);
+  }
+  .text-glow-bear {
+    text-shadow: 0 0 18px rgba(255, 107, 122, 0.45), 0 0 40px rgba(255, 107, 122, 0.15);
+  }
+  /* Subtle pulse for the live-value emphasis */
+  .text-glow-pulse {
+    animation: text-glow-pulse 2.8s ease-in-out infinite;
+  }
   /* Gradient headline */
   .text-gradient-frost {
     background: linear-gradient(100deg, #e8f4fb 10%, #7be1ff 55%, #b48cff 95%);
@@ -282,6 +293,11 @@
 @keyframes glow-pulse {
   0%, 100% { box-shadow: 0 0 12px rgba(61, 220, 151, 0.15); }
   50% { box-shadow: 0 0 22px rgba(61, 220, 151, 0.35); }
+}
+
+@keyframes text-glow-pulse {
+  0%, 100% { text-shadow: 0 0 16px rgba(123, 225, 255, 0.25), 0 0 40px rgba(123, 225, 255, 0.08); }
+  50% { text-shadow: 0 0 22px rgba(123, 225, 255, 0.55), 0 0 60px rgba(123, 225, 255, 0.2); }
 }
 
 @keyframes spark-draw {
