@@ -177,3 +177,28 @@ Stage Summary:
 - ✅ GITHUB SYNC COMPLETE: local main and origin/main are IDENTICAL at 786daf5; RULES.md (NEVER-FORCE-PUSH + SESSION-START-SYNC-CHECK) is live on the remote
 - Git workflow from now on (every future session): SESSION-START-SYNC-CHECK first (fetch → status → compare vs origin/main; behind/diverged → STOP and report) → work → commit → normal push only (NEVER force) → if rejected: STOP, report, wait for owner
 - Unresolved/next-phase items: 1) AGW payment E2E live smoke test with funded account; 2) Cloudflare deployment (docs ready — needs owner account); 3) Feature roadmap: AGW session-key auto-renew subscription, Telegram/email alerts, backtest sandbox UI
+
+---
+Task ID: 6
+Agent: Main Agent (Z.ai Code)
+Task: Round 6 — full audit (rate limits, resource budgets, free-tier fitness), Abstract-ecosystem docs alignment, subscription renewal UX (session-key alternative per docs)
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: fetch OK, local == remote == 91b2ffe, working tree clean → proceeded
+- AUDIT (all findings + fixes):
+  1. Rate-limit coverage was 11/16 routes → added limits to the 5 unprotected: /api/signal/today (30/min, the paid product), /api/config (60/min), /api/auth/me (60/min), /api/auth/logout (10/min), /api/health /api/route (60/min). Verified functionally: 30×200→429, 60×200→429, 10×200→429
+  2. GeckoTerminal budget: 3-layer protection intact (TTL cache + coalescing + 24/min token bucket vs 30/min free limit); worst-case steady-state upstream ≈5 calls/min with multiple viewers — healthy headroom, no change (avoided over-engineering)
+  3. RPC usage: only user-action-triggered eth_* calls (auth verify ERC-1271, payment verify receipts) with 15s timeouts — no polling, aligned with JSON-RPC API docs
+  4. AGW implementation verified line-by-line against official docs: AbstractWalletProvider(chain, transport, queryClient) exact pattern; useLoginWithAbstract login/logout; canonical viem/chains — ✅ fully aligned
+- DOCS RESEARCH (docs.abs.xyz llms.txt + 7 pages + build.abs.xyz): KEY FINDING — session keys on MAINNET require app security review + Session Key Policy Registry listing → the planned session-key auto-renew is NOT viable short-term → implemented the pragmatic alternative instead (per owner's anti-over-engineering directive)
+- NEW FEATURE — Subscription renewal UX (src/components/signal/signal-card.tsx SubscriptionStatus): lifecycle strip with 3 states — active (green, days-left badge with locale digits, 8px progress bar w/ soft glow), expiring-soon ≤3 days (amber warning + renew CTAs), expired (rose + renew CTAs); one-click +۷/+۳۰ renew via existing PayButton → server ALREADY stacks renewal days on current expiry (verified payments/verify base logic) so early renewal loses nothing; note text explains stacking
+- Docs: docs/ABSTRACT_PORTAL.md new section 7 "Ecosystem alignment audit" — table mapping AGW provider/login/ERC-1271/JSON-RPC/build.abs.xyz(AGW Reusables)/session-keys/AI-agent-resources to our implementation + rationale for no session keys
+- New dev tool: scripts/qa-subscription-fixture.ts — creates a REAL session (nonce→EOA sign→verify) and sets subscription state in DB exactly as the on-chain verifier would credit it, enabling browser QA of the renewal strip without a funded wallet (QA user fully cleaned up after)
+- QA: lint clean; tsc src/ 0 errors; E2E security 18/18; browser QA via agent-browser: renewal strip verified in ALL 3 states EN+FA (expiring-soon: "Expiring soon"/"2 days left"/+7/+30 buttons + payment dialog opens "Pay 7 PENGU" w/ treasury; expired FA: "اشتراک پایان یافت"+دکمه‌ها; active FA: "اشتراک فعال"+"۱۰ روز باقیمانده" Persian digits, renew buttons correctly hidden); mobile 390px scrollWidth=390 no overflow; VLM visual review: initial 7.5/10 → applied polish (thicker glow progress bar h-2 + shadow, brighter renewal note text-foreground/75) → re-review 9/10 on all criteria (progress bar visibility, note readability, overall polish/RTL)
+
+Stage Summary:
+- Audit complete: every API route now rate-limited (16/16), upstream budgets verified healthy, no over-engineering introduced (session-key path documented but deliberately deferred — mainnet requires security review)
+- Ecosystem alignment verified against official docs and recorded in docs/ABSTRACT_PORTAL.md §7
+- New user-facing feature: subscription lifecycle strip with one-click stacking renewal (the honest "auto-renew" without custodial risk)
+- All QA green: E2E 18/18, lint clean, tsc clean, 3-state browser verification EN+FA, mobile OK, VLM 9/10
+- Unresolved/next-phase items: 1) AGW payment live smoke test with funded account (still the main acceptance gap); 2) Cloudflare deployment (docs ready — owner account needed); 3) Optional roadmap: Telegram/email alerts for subscribers, backtest sandbox UI; session-key auto-renew only if product justifies the mainnet security-review process

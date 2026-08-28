@@ -77,3 +77,26 @@ manually:
 - Move collected funds to your secure storage periodically; the app only needs
   the address to stay unchanged to keep verifying payments.
 - Keep `SESSION_SECRET` and any Wrangler secrets out of git.
+
+## 7. Ecosystem alignment audit (docs.abs.xyz / build.abs.xyz — 2026-08)
+
+How this codebase maps to the official Abstract documentation:
+
+| Docs reference | Our implementation | Status |
+|---|---|---|
+| [AGW — AbstractWalletProvider](https://docs.abs.xyz/abstract-global-wallet/agw-react/AbstractWalletProvider) | `AbstractWalletProvider chain={abstract\|abstractTestnet} transport={http(rpc)} queryClient={…}` — exact official pattern (src/components/providers.tsx) | ✅ aligned |
+| [AGW — useLoginWithAbstract](https://docs.abs.xyz/abstract-global-wallet/agw-react/hooks/useLoginWithAbstract) | `login`/`logout` drive the connect button; AGW modal handles email/social/external wallets | ✅ aligned |
+| [AGW — Signature Validation / ERC-1271](https://docs.abs.xyz/how-abstract-works/native-account-abstraction/signature-validation) | Auth verifies smart-account signatures via `publicClient.verifyMessage` (ERC-1271 + ERC-6492 counterfactual support) — never raw ECDSA checks | ✅ aligned |
+| [Abstract JSON-RPC API](https://docs.abs.xyz/api-reference/overview/abstract-json-rpc-api) | Server uses only standard `eth_*` methods (`eth_getTransactionReceipt`, `eth_getBlockByNumber`, `eth_call`) against the public RPC — no `zks_`/`debug_` dependencies | ✅ aligned |
+| [build.abs.xyz — AGW Reusables](https://build.abs.xyz) | shadcn/ui-compatible AGW component registry (Connect Wallet, Sign-in with Ethereum, Session Keys, Onboarding). Our custom components already cover connect + sign-in with the same AGW SDK underneath — no duplication needed | ✅ noted |
+| [Session keys](https://docs.abs.xyz/abstract-global-wallet/session-keys/overview) | **Mainnet session keys require a security review + Session Key Policy Registry listing.** We deliberately do NOT use them: "auto-renew" is implemented as prepaid packages + one-click stacking renewal (days extend from current expiry) — user-signed, no background charging, no review dependency | ✅ pragmatic choice |
+| [AI-agents resources](https://docs.abs.xyz/ai-agents/resources/overview) | `docs.abs.xyz/llms.txt` is the canonical doc index; any page is fetchable as Markdown by appending `.md` | ✅ used for this audit |
+
+**Why no session keys today:** session keys would let the app charge
+1 PENGU/day while the user is offline, but on mainnet they mandate an app
+security review and registry whitelisting (per the official docs). That is a
+heavy process with real custodial risk for a 1 PENGU/day product. The stacking
+renewal UX delivers the same outcome — uninterrupted daily signals — with the
+user signing exactly one transaction per renewal period. If the product later
+justifies it, the session-key path (createSession/toSessionClient from
+`@abstract-foundation/agw-client`) remains open and documented.

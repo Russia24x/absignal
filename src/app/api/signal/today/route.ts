@@ -3,6 +3,7 @@ import { getSessionUser, cookieFromRequest } from '@/lib/auth/session'
 import { getTodaySignal, utcDate } from '@/lib/signal/daily'
 import { db } from '@/lib/db'
 import { chain } from '@/lib/config'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,9 @@ export const dynamic = 'force-dynamic'
  * withheld so the paid content never leaks).
  */
 export async function GET(req: Request) {
+  const rl = rateLimit(`today:${clientIp(req)}`, 30, 60_000)
+  if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+
   const user = await getSessionUser(cookieFromRequest(req))
   const today = utcDate()
 

@@ -394,6 +394,116 @@ function NextSignalCountdown() {
   )
 }
 
+/* --------------------------- Subscription status --------------------------- */
+
+/**
+ * Subscription lifecycle strip: days remaining, progress, expiry warning
+ * and one-click renewal (+7 / +30 days). Renewal days stack on top of the
+ * current plan (server-side), so renewing early never loses time.
+ *
+ * This is the pragmatic alternative to AGW session-key auto-renew: session
+ * keys require a mainnet security review + policy-registry listing (see
+ * docs/ABSTRACT_PORTAL.md), so we keep the user in control with one-click
+ * stacking renewals instead of background charging.
+ */
+function SubscriptionStatus({ user }: { user: { subscriptionUntil: string | null } }) {
+  const { t, tf, fmt } = useI18n()
+  const until = user.subscriptionUntil ? new Date(user.subscriptionUntil) : null
+  if (!until) return null
+
+  const msLeft = until.getTime() - Date.now()
+  const active = msLeft > 0
+  const daysLeft = Math.max(0, Math.ceil(msLeft / 86_400_000))
+  const expiringSoon = active && daysLeft <= 3
+  // Progress relative to a 30-day window (longest package).
+  const pct = Math.min(100, Math.max(2, Math.round((msLeft / (30 * 86_400_000)) * 100)))
+  const dateStr = until.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+
+  return (
+    <div
+      className={cn(
+        'mb-4 rounded-xl border p-4 flex flex-col gap-3 card-interactive',
+        expiringSoon
+          ? 'border-amber-400/30 bg-amber-400/5'
+          : active
+            ? 'border-accent/25 bg-accent/5'
+            : 'border-rose-400/30 bg-rose-400/5'
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Crown
+            className={cn(
+              'size-4 shrink-0',
+              expiringSoon ? 'text-amber-400' : active ? 'text-accent' : 'text-rose-400'
+            )}
+          />
+          <span className="text-sm font-semibold truncate">
+            {expiringSoon
+              ? t.signal.expiresSoon
+              : active
+                ? t.signal.activeSubscription
+                : t.signal.expired}
+          </span>
+          {active && (
+            <Badge
+              variant="outline"
+              className={cn(
+                'gap-1 whitespace-nowrap font-mono',
+                expiringSoon ? 'border-amber-400/40 text-amber-300' : 'border-accent/40 text-accent'
+              )}
+            >
+              <Timer className="size-3" />
+              {tf(t.signal.daysLeft, { days: fmt(daysLeft) })}
+            </Badge>
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground font-mono whitespace-nowrap">{dateStr}</span>
+      </div>
+
+      {active && (
+        <div
+          className="h-2 rounded-full bg-muted overflow-hidden"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <div
+            className={cn(
+              'h-full rounded-full transition-all duration-700',
+              expiringSoon
+                ? 'bg-amber-400 shadow-[0_0_12px_2px_rgba(251,191,36,0.45)]'
+                : 'bg-accent shadow-[0_0_12px_2px_rgba(74,222,128,0.35)]'
+            )}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+
+      {(expiringSoon || !active) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-foreground/75 flex-1 min-w-40 leading-relaxed">
+            {t.signal.renewNote}
+          </p>
+          <div className="flex items-center gap-2">
+            <PayButton type="SUBSCRIPTION" days={7} size="sm" variant="secondary">
+              {t.signal.extend7}
+            </PayButton>
+            <PayButton type="SUBSCRIPTION" days={30} size="sm">
+              {t.signal.extend30}
+            </PayButton>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ------------------------------ The card ------------------------------ */
 
 export function SignalCard() {
@@ -452,6 +562,7 @@ export function SignalCard() {
         <div className="aurora-line mt-3" />
       </CardHeader>
       <CardContent>
+        {user?.subscriptionUntil && <SubscriptionStatus user={user} />}
         {state === 'loading' && (
           <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
             <Loader2 className="size-6 animate-spin text-primary" />
