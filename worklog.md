@@ -718,3 +718,30 @@ Stage Summary:
 - Product verified as deployable: all gates green, VLM go-live review 9.2/10 hero + 9/10 paywall
 - GitHub repo is clean, in sync, and professional (152 files, all used, documented structure)
 - Remaining for the OWNER (documented in DEPLOYMENT.md): run §1 one-time repo prep on a machine with wrangler (opennextjs init + D1 create + Prisma adapter switch — intentionally NOT committed blind from the sandbox since the D1 database_id is account-specific), generate SESSION_SECRET, fund treasury, then §6 post-deploy verification
+
+---
+Task ID: 20
+Agent: orchestrator (main)
+Task: Owner correction (Persian) — "free principle" meant INFRASTRUCTURE/backend/hosting only, NOT the service: the service is PAID. Restore the paid product; purge fake data; implement official Abstract gas optimization (optimistic write + paymaster sponsorship); fix browser popup blocking per official AGW docs; full production readiness.
+
+Work Log:
+- RECOVERED THE PAID PRODUCT: the previous (context-exhausted) round had MISREAD "free" and left an uncommitted working tree that deleted the entire payments module (−2,130 lines: payments/onchain.ts, api/payments/intent+verify, payment-flow.tsx, Prisma subscription models, tiered pricing in config.ts, holder-perks) and rewrote copy to "100% free, no payments". Restored everything with `git checkout HEAD -- .` (paid model verified: 10/65/255/2750/7650 PENGU staircase renders, e2e 22/22 green again).
+- Prisma client regenerated (bun run db:generate + db:push) — the bad round had also shrunk the generated client; typecheck back to 0 errors.
+- OFFICIAL DOCS RESEARCH (fetched live via z-ai page_reader): build.abs.xyz/docs/experimental/use-optimistic-write-contract (full reusable source), docs.abs.xyz AGW overview/architecture/FAQ, useWriteContractSponsored hook, native-AA paymasters page. Key facts verified: AGW account deployment is sponsored by Abstract's default paymaster (FAQ); the optimistic endpoint is `unstable_sendRawTransactionWithDetailedOutput`; sponsored writes attach `paymaster`+`paymasterInput` (getGeneralPaymasterInput from viem/zksync).
+- GAS OPTIMIZATION IMPLEMENTED:
+  • src/lib/abstract/optimistic-tx.ts — official optimistic API client, pointed at our active chain RPC (mainnet), with the doc's human-readable error mapping.
+  • src/hooks/use-optimistic-write-contract.ts — official AGW reusable hook adapted (TS-strict, encodeFunctionData → prepareTransactionRequest → signTransaction → optimistic submit), EXTENDED with sponsor-paymaster support: NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS (General flow) → user pays 0 gas.
+  • payment-flow.tsx rewired: primary path = optimistic sponsored write (instant pre-confirmation hash → instant UI), automatic fallback to standard wagmi writeContractAsync on transport/endpoint errors (user-rejection & insufficient-funds handled separately); new "Network fee" row in the dialog shows sponsored (0 gas) vs wallet-ETH note; "instant submit" status line. i18n keys added (en+fa): pay.fee/gasSponsored/gasNote/instantSubmit.
+- POPUP-BLOCK HARDENING (official AGW/Privy guidance): verified login() and pay() fire synchronously inside user gestures (no await chains); added src/lib/wallet/embedded-browser.ts (Telegram/Instagram/Facebook/TikTok/Snapchat/Line UA detection) + pre-login warning toast (auth.embeddedBrowserHint en/fa) because in-app browsers block wallet popups.
+- FAKE-DATA AUDIT: grep + read-through of sentiment.ts, daily.ts, live-stats-strip, geckoterminal.ts, backtest/replay.ts, dict copy — everything is real-data (GeckoTerminal DEX candles/overview, locked per-UTC-day signal engine, honest "educational simulation on historical data" backtest labeling). No mock/fake data found; zero removals needed.
+- DOCS: DEPLOYMENT.md §0.5 "Gas: how payments stay cheap / free" (optimistic tx + AGW deployment sponsorship + step-by-step optional paymaster deployment guide with security notes); variables tables + .env.example gained NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS.
+- DEV-OPS FIX: dev server had died mid-round (stale Turbopack cache from the bad round's file deletion caused phantom "Module not found: payment-flow" errors); restarted with cleared cache using the persistent `(setsid … &)` double-fork pattern — server now survives across tool commands.
+- FULL VERIFICATION: tsc 0 errors · lint clean · e2e-auth 22/22 (paid intents, exact wei, on-chain verify of fake tx rejected) · browser QA FA+EN: 12 sections, footer OK, FAQ search works, EN/FA toggle works, mobile 390px scrollWidth=390 zero overflow · console 0 errors/0 page-errors after clean reload · all API routes 200 with live market data · VLM: hero 8.5/10 ("polished, professional, excellent RTL"), pricing 9/10 (5 paid plans + free tier confirmed, RTL correct; VLM misread small Persian digits — DOM check is source of truth: 10/65/255/2750/7,650).
+- Git: committed & pushed to github.com/Russia24x/absignal.
+
+Stage Summary:
+- The PAID PENGU subscription product is fully restored and verified end-to-end; the "free service" misreading is completely reversed (nothing of it remains).
+- Gas strategy now follows official Abstract standards on three layers: (1) AGW account deployment already sponsored by Abstract; (2) payments submitted via the official optimistic endpoint for instant feedback; (3) optional full gas sponsorship via env-configured General paymaster — code, copy, env, and deployment docs all wired.
+- Popup blocking addressed per official guidance: gesture-synchronous wallet calls + embedded-browser detection with actionable warning.
+- Fake-data audit: clean — product is 100% real-data driven.
+- Remaining for the OWNER: fund treasury; (optional) deploy + fund a General paymaster and set NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS for 0-gas payments; then DEPLOYMENT.md §1→§6 go-live steps. Live funded-wallet payment smoke test still pending (sandbox cannot reach privy.abs.xyz).

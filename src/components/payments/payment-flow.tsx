@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Sparkles,
   Wallet,
+  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,6 +44,10 @@ import { useAbstractProfileByAddress } from '@/hooks/use-abstract-profile'
 import { AbstractProfile } from '@/components/abstract/abstract-profile'
 import { getDisplayName } from '@/lib/abstract/get-user-profile'
 import { appChain, penguAddress, treasuryAddress } from '@/lib/chains'
+import {
+  useOptimisticWriteContract,
+  isGasSponsored,
+} from '@/hooks/use-optimistic-write-contract'
 import { cn } from '@/lib/utils'
 
 export type PayPlanId = 'day' | 'week' | 'month' | 'year' | 'lifetime'
@@ -119,6 +124,10 @@ export function PaymentDialog({
   const { address, chainId } = useAccount()
   const { switchChain } = useSwitchChain()
   const { writeContractAsync } = useWriteContract()
+  // Official AGW optimistic submission (build.abs.xyz
+  // /docs/experimental/use-optimistic-write-contract): instant pre-
+  // confirmation hash + optional sponsor paymaster (0 gas for the user).
+  const { writeContractAsync: optimisticWrite } = useOptimisticWriteContract()
   const verify = useVerifyPayment()
 
   const [step, setStep] = useState<Step>('review')
@@ -161,24 +170,53 @@ export function PaymentDialog({
     if (!intent || !address) return
     setError(null)
     setStep('wallet')
+    const txArgs = [
+      treasuryAddress as `0x${string}`,
+      BigInt(intent.amountWei),
+    ] as const
     try {
-      const hash = await writeContractAsync({
+      // Primary path — optimistic submission via Abstract's
+      // unstable_sendRawTransactionWithDetailedOutput: the hash comes
+      // back instantly, and when a sponsor paymaster is configured the
+      // user's gas is fully covered (0 network fee).
+      const result = await optimisticWrite({
         address: penguAddress as `0x${string}`,
         abi: erc20Abi,
         functionName: 'transfer',
-        args: [treasuryAddress as `0x${string}`, BigInt(intent.amountWei)],
-        chainId: intent.chainId,
+        args: txArgs,
       })
-      setTxHash(hash)
+      setTxHash(result.transactionHash)
       setStep('chain')
-    } catch (err) {
-      const message = (err as Error).message ?? ''
-      if (/insufficient/i.test(message)) setError(t.pay.insufficientBalance)
-      else if (/rejected|denied|user rejected|User rejected/i.test(message)) setError(t.pay.failed)
-      else setError(message)
-      setStep('error')
+    } catch (optErr) {
+      const optMsg = (optErr as Error).message ?? ''
+      const userAborted = /rejected|denied|user rejected|cancelled|canceled/i.test(optMsg)
+      const insufficient = /insufficient/i.test(optMsg)
+      if (userAborted || insufficient) {
+        setError(insufficient ? t.pay.insufficientBalance : t.pay.failed)
+        setStep('error')
+        return
+      }
+      // Transport / optimistic-endpoint failure → standard wagmi path
+      // (identical security: the backend still verifies the receipt).
+      try {
+        const hash = await writeContractAsync({
+          address: penguAddress as `0x${string}`,
+          abi: erc20Abi,
+          functionName: 'transfer',
+          args: [treasuryAddress as `0x${string}`, BigInt(intent.amountWei)],
+          chainId: intent.chainId,
+        })
+        setTxHash(hash)
+        setStep('chain')
+      } catch (err) {
+        const message = (err as Error).message ?? ''
+        if (/insufficient/i.test(message)) setError(t.pay.insufficientBalance)
+        else if (/rejected|denied|user rejected|User rejected/i.test(message)) setError(t.pay.failed)
+        else setError(message)
+        setStep('error')
+      }
     }
-  }, [intent, address, writeContractAsync, t])
+  }, [intent, address, optimisticWrite, writeContractAsync, t])
 
   const steps = [
     { id: 1, label: t.pay.steps.request },
@@ -294,6 +332,16 @@ export function PaymentDialog({
               {intent.chainId === 2741 ? 'Abstract Mainnet' : 'Abstract Testnet'}
             </span>
           </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">{t.pay.fee}</span>
+            {isGasSponsored ? (
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
+                <Zap className="size-3.5" /> {t.pay.gasSponsored}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">{t.pay.gasNote}</span>
+            )}
+          </div>
         </div>
 
         {/* Status / actions */}
@@ -335,7 +383,9 @@ export function PaymentDialog({
                 {effectiveStep === 'chain' && (
                   <>
                     <div className="font-semibold">{t.pay.waitingChain}</div>
-                    <div className="text-xs text-muted-foreground">{t.pay.autoRetry}</div>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Zap className="size-3 text-primary" /> {t.pay.instantSubmit}
+                    </div>
                   </>
                 )}
                 {effectiveStep === 'verifying' && (

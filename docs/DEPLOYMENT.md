@@ -33,6 +33,51 @@
 
 ---
 
+## 0.5 Gas: how payments stay cheap / free (Abstract official features)
+
+The app already implements two official Abstract standards — no extra infra
+required for them to work:
+
+1. **Optimistic transactions** — subscription payments are submitted through
+   Abstract's `unstable_sendRawTransactionWithDetailedOutput` RPC endpoint
+   (the official AGW reusable: `build.abs.xyz/docs/experimental/use-optimistic-write-contract`,
+   adapted in `src/hooks/use-optimistic-write-contract.ts` +
+   `src/lib/abstract/optimistic-tx.ts`). The wallet UI receives the
+   transaction hash *instantly* (pre-confirmation) while the receipt is
+   polled and server-verified as before. If the endpoint is ever
+   unavailable, the flow automatically falls back to the standard wagmi
+   submission — identical security, only without instant feedback.
+2. **AGW deployment sponsorship** — Abstract's default paymaster already
+   sponsors the user's AGW smart-account deployment (official FAQ:
+   `docs.abs.xyz/abstract-global-wallet/frequently-asked-questions`), so
+   brand-new wallets can transact with zero ETH setup.
+
+### Optional: sponsor your users' payment gas (0-fee payments)
+
+To make the payment transaction itself **completely free for users** (you
+pay the gas — fractions of a cent per tx on Abstract):
+
+1. Deploy a **General paymaster** on Abstract mainnet — start from the
+   official example repo (`docs.abs.xyz/how-abstract-works/native-account-abstraction/paymasters`
+   → "Paymasters Example Repo"), and make `validateAndPayForPaymasterTransaction`
+   return `PAYMASTER_VALIDATION_SUCCESS_MAGIC` only for transactions you
+   want to sponsor (e.g. restrict `to` == PENGU token, or require a
+   signature from your backend).
+2. Fund the paymaster contract with ETH for gas (keep a low balance +
+   an alert — a compromised paymaster only risks its own balance).
+3. Set the variable (plaintext is fine — the address is public):
+   `NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS=0xYourPaymaster…`
+4. Redeploy. The payment dialog now shows "Network fee: sponsored — you
+   pay 0 gas" and payment txs are submitted with the paymaster attached
+   (the official `useWriteContractSponsored` pattern from
+   `docs.abs.xyz/abstract-global-wallet/agw-react/hooks/useWriteContractSponsored`).
+
+Without a paymaster configured, users simply pay normal (very low)
+Abstract gas from their wallet ETH, and the AGW deployment fee is already
+sponsored by Abstract.
+
+---
+
 ## 1. One-time repo preparation (Cloudflare paths A & B)
 
 The app runs on **Cloudflare Workers** via
@@ -218,6 +263,7 @@ In the same setup screen → **Variables and Secrets**:
 | Variable | `NEXT_PUBLIC_RPC_MAINNET` | `https://api.mainnet.abs.xyz` |
 | Variable | `NEXT_PUBLIC_PENGU_MAINNET` | `0x9ebe3a824ca958e4b3da772d2065518f009cba62` |
 | Variable | `NEXT_PUBLIC_TREASURY_ADDRESS` | `0x60Df4E186364c3a49A550Aee29Da1d5fe3658818` |
+| Variable | `NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS` | *(optional — see §0.5; empty = users pay own gas)* |
 | Variable | `GECKOTERMINAL_NETWORK` | `abstract` |
 | Variable | `GECKOTERMINAL_POOL` | `0xda7d037fda848177141e037f9d0c67cae7b53262` |
 | Variable | `SUBSCRIPTION_1D_PRICE_PENGU` | `10` |

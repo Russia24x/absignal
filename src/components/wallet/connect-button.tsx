@@ -34,6 +34,7 @@ import { getTierName, getTierColor } from '@/lib/abstract/tier-colors'
 import { countClaimedBadges, getDisplayName, portalProfileUrl } from '@/lib/abstract/get-user-profile'
 import { AbstractProfile } from '@/components/abstract/abstract-profile'
 import { appChain, penguAddress } from '@/lib/chains'
+import { isEmbeddedBrowser } from '@/lib/wallet/embedded-browser'
 import { toast } from 'sonner'
 
 function shortAddress(addr: string): string {
@@ -124,6 +125,10 @@ function AgwConnectButton() {
     isConnected && !authed && signIn.isPending ? t.auth.signingIn : null
 
   const openAgwLogin = async () => {
+    // Popup-safety (official AGW/Privy guidance): in-app browsers
+    // (Telegram/Instagram/…) block wallet popups — warn before attempting,
+    // but still try, since some in-app browsers do allow the iframe modal.
+    if (isEmbeddedBrowser()) toast.warning(t.auth.embeddedBrowserHint, { duration: 8000 })
     setLoginOpening(true)
     // Dead-stack guard: if the AGW backend died AFTER the gate probe
     // (e.g. network dropped mid-session), login() hangs with no modal.

@@ -213,6 +213,10 @@ export const dict = {
       wrongChain: 'Wrong network — switch to Abstract',
       switchChain: 'Switch to Abstract',
       insufficientBalance: 'Not enough PENGU balance',
+      fee: 'Network fee',
+      gasSponsored: 'Network fee: sponsored — you pay 0 gas',
+      gasNote: 'Network fee paid from your wallet ETH',
+      instantSubmit: 'Instant submission — Abstract fast path',
       balance: 'Your PENGU balance',
       cancel: 'Cancel',
       close: 'Close',
@@ -529,6 +533,8 @@ export const dict = {
       walletUnavailable: 'Wallet service unavailable',
       walletUnavailableHint:
         'The wallet backend (privy.abs.xyz) is unreachable from your network. Check your connection, disable blockers/VPN restrictions, then retry.',
+      embeddedBrowserHint:
+        'You are inside an in-app browser (Telegram/Instagram/…). Wallet popups are usually blocked here — open this page in Safari or Chrome to connect smoothly.',
       subDaysLeft: '{days} days of access left',
       noSubscription: 'No active plan — signals locked.',
       choosePlan: 'Choose a plan',
@@ -808,6 +814,10 @@ export const dict = {
       wrongChain: 'شبکه اشتباه — به Abstract سوئیچ کنید',
       switchChain: 'سوئیچ به Abstract',
       insufficientBalance: 'موجودی پنگو کافی نیست',
+      fee: 'کارمزد شبکه',
+      gasSponsored: 'کارمزد شبکه: اسپانسری — کارمزد صفر برای شما',
+      gasNote: 'کارمزد شبکه از ETH کیف پول شما پرداخت می‌شود',
+      instantSubmit: 'ارسال فوری از مسیر سریع Abstract',
       balance: 'موجودی پنگوی شما',
       cancel: 'انصراف',
       close: 'بستن',
@@ -1118,6 +1128,8 @@ export const dict = {
       walletUnavailable: 'سرویس کیف پول در دسترس نیست',
       walletUnavailableHint:
         'سرویس کیف پول (privy.abs.xyz) از شبکهٔ شما در دسترس نیست. اتصال اینترنت را بررسی کنید، مسدودسازها/محدودیت‌های شبکه را غیرفعال کنید و دوباره تلاش کنید.',
+      embeddedBrowserHint:
+        'شما داخل مرورگر درون‌برنامه‌ای هستید (تلگرام/اینستاگرام/…). پاپ‌آپ کیف پول معمولاً اینجا مسدود می‌شود — این صفحه را در Safari یا Chrome باز کنید تا اتصال به‌درستی انجام شود.',
       subDaysLeft: '{days} روز دسترسی باقی‌مانده',
       noSubscription: 'پلن فعالی ندارید — سیگنال‌ها قفل هستند.',
       choosePlan: 'انتخاب پلن',
