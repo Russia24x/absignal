@@ -6,7 +6,6 @@
  * Shows an empty-state message when nothing matches. Keyboard hint chip
  * tells the user they can press "/" to focus the search field.
  */
-import { motion } from 'framer-motion'
 import { Search, Slash, X } from 'lucide-react'
 import {
   Accordion,
@@ -57,31 +56,16 @@ export function Faq() {
     : items
 
   return (
-    <section id="faq" className="relative py-16 sm:py-20">
+    <section id="faq" className="border-t border-border/60 py-14 sm:py-16">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-8"
-        >
-          <span className="inline-block text-[11px] font-bold uppercase tracking-[0.25em] text-primary/80 mb-3">
-            {t.eyebrow.faq}
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-gradient-frost">
+        <div className="mb-8 text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
             {t.faq.title}
           </h2>
-        </motion.div>
+        </div>
 
         {/* Search filter */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="mb-6"
-        >
+        <div className="mb-6">
           <div className="relative">
             <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
@@ -118,14 +102,9 @@ export function Faq() {
               ? t.faq.resultCount.replace('{n}', String(filtered.length))
               : t.faq.searchHint}
           </p>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-        >
+        <div>
           {filtered.length === 0 ? (
             <div className="rounded-2xl border border-border/60 glass p-8 text-center">
               <Search className="mx-auto size-6 text-muted-foreground/60 mb-3" />
@@ -163,7 +142,7 @@ export function Faq() {
               ))}
             </Accordion>
           )}
-        </motion.div>
+        </div>
       </div>
     </section>
   )

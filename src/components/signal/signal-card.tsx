@@ -41,6 +41,7 @@ import { useI18n } from '@/lib/i18n/context'
 import { useSignalToday, useSession, useAppConfig, useTrackRecord } from '@/hooks/use-app-data'
 import { useNextSignalCountdown } from '@/hooks/use-countdown'
 import { PayButton } from '@/components/payments/payment-flow'
+import { ConnectWalletButton } from '@/components/wallet/connect-button'
 import { verdictStyles, ScoreGauge } from '@/components/signal/verdict-ui'
 import { cn } from '@/lib/utils'
 
@@ -129,7 +130,7 @@ function LockedPreview() {
             </div>
             <div className="px-4 pb-3 -mt-1">
               <a
-                href="#track"
+                href="#performance"
                 className="inline-flex items-center gap-1 text-[11px] text-primary/80 hover:text-primary transition-colors font-semibold"
               >
                 {t.signal.previewSampleNote} →
@@ -205,6 +206,7 @@ function LockedState({ kind }: { kind: 'connect' | 'signing' | 'subscribe' }) {
         <>
           <h3 className="text-lg font-bold">{t.signal.connectFirst}</h3>
           <p className="text-sm text-muted-foreground max-w-md">{t.signal.lockedDesc}</p>
+          <ConnectWalletButton />
         </>
       )}
 
@@ -344,7 +346,7 @@ function FullSignal({ signal }: { signal: NonNullable<ReturnType<typeof useSigna
     .join('\n')
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Verdict hero */}
       <div className={cn('rounded-2xl border p-5 flex flex-col sm:flex-row items-center gap-6', vs.bg, vs.glow)}>
         <ScoreGauge score={signal.score} />
@@ -437,9 +439,9 @@ function FullSignal({ signal }: { signal: NonNullable<ReturnType<typeof useSigna
                   {tf.score >= 0 ? '+' : ''}
                   {tf.score.toFixed(0)}
                 </div>
-                <div className="text-[10px] text-muted-foreground">{tf.note}</div>
+                <div className="text-[11px] text-muted-foreground">{tf.note}</div>
                 {tf.trendStrength != null && (
-                  <div className="text-[10px] text-muted-foreground mt-1">
+                  <div className="text-[11px] text-muted-foreground mt-1">
                     ADX: <span className="font-mono">{tf.trendStrength.toFixed(0)}</span>
                   </div>
                 )}
@@ -463,7 +465,7 @@ function FullSignal({ signal }: { signal: NonNullable<ReturnType<typeof useSigna
                   <TooltipProvider key={ind.key}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 border-b border-border/40 last:border-0 text-sm hover:bg-secondary/40 transition-colors cursor-help">
+                        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/40 last:border-0 text-sm hover:bg-secondary/40 transition-colors cursor-help">
                           <div className="flex items-center gap-2 min-w-0">
                             <span
                               className={cn(
@@ -739,7 +741,7 @@ export function SignalCard() {
     : null
 
   return (
-    <Card className="glass border-primary/15 overflow-hidden" id="signal">
+    <Card className="border-border overflow-hidden">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-lg">

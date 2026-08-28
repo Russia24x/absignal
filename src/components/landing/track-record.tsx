@@ -1,9 +1,9 @@
 'use client'
 
 /**
- * Public track record: every locked daily verdict scored against the real
- * next-day move. Transparency is the product's trust anchor.
- * Visuals: animated stat counters, win-rate donut, 30-day outcome strip.
+ * Track record body (rendered inside PerformanceSection): every locked
+ * daily verdict scored against the real next-day move. Transparency is
+ * the product's trust anchor.
  */
 
 import { useState } from 'react'
@@ -96,30 +96,11 @@ export function TrackRecord() {
   const stats = data?.stats
 
   return (
-    <section id="track" className="relative py-16 sm:py-20">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-10"
-        >
-          <span className="inline-block text-[11px] font-bold uppercase tracking-[0.25em] text-primary/80 mb-3">
-            {t.eyebrow.track}
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-gradient-frost">
-            {t.track.title}
-          </h2>
-          <p className="mt-3 text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            {t.track.subtitle}
-          </p>
-        </motion.div>
-
-        {/* Equity curve */}
-        <div className="mb-6">
-          <EquityCurve />
-        </div>
+    <div>
+      {/* Equity curve */}
+      <div className="mb-6">
+        <EquityCurve />
+      </div>
 
         {/* Stats */}
         {stats && stats.total > 0 && (
@@ -218,7 +199,7 @@ export function TrackRecord() {
               ) : (
                 <div className="max-h-96 overflow-y-auto">
                   <Table>
-                    <TableHeader className="sticky top-0 bg-[#0a1a2a]/95 backdrop-blur z-10">
+                    <TableHeader className="sticky top-0 bg-card/95 backdrop-blur z-10">
                       <TableRow className="hover:bg-transparent border-border/40">
                         <TableHead className="text-xs">{t.track.date}</TableHead>
                         <TableHead className="text-xs">{t.track.verdict}</TableHead>
@@ -307,9 +288,8 @@ export function TrackRecord() {
             </CardContent>
           </Card>
         </motion.div>
-      </div>
 
       <SignalDetailDialog date={detailDate} onOpenChange={(open) => !open && setDetailDate(null)} />
-    </section>
+    </div>
   )
 }

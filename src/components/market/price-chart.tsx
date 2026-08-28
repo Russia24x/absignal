@@ -25,7 +25,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { useI18n } from '@/lib/i18n/context'
 import { useCandles } from '@/hooks/use-app-data'
-import { OscillatorsPanel } from '@/components/market/oscillators-panel'
 import { cn } from '@/lib/utils'
 
 const TIMEFRAMES = ['15m', '1h', '4h', '1d'] as const
@@ -79,13 +78,13 @@ export function PriceChart() {
     const chart = createChart(containerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#8fb0c5',
+        textColor: '#a9c3d6',
         fontFamily: 'var(--font-inter), system-ui, sans-serif',
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: 'rgba(123, 225, 255, 0.05)' },
-        horzLines: { color: 'rgba(123, 225, 255, 0.05)' },
+        vertLines: { color: 'rgba(123, 225, 255, 0.07)' },
+        horzLines: { color: 'rgba(123, 225, 255, 0.07)' },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
@@ -340,10 +339,6 @@ export function PriceChart() {
             <GitCompare className="size-3" />
             {tfn(tr.market.compare, { tf: compareTf })}
           </button>
-        </div>
-        {/* RSI + MACD subpanels — share the same tf as the main chart */}
-        <div className="mt-4">
-          <OscillatorsPanel tf={tf} />
         </div>
       </CardContent>
     </Card>

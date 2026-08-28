@@ -11,7 +11,7 @@
  * and a wrong-network switcher as a safety net.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAccount, useSwitchChain, useReadContract } from 'wagmi'
 import { useLoginWithAbstract } from '@abstract-foundation/agw-react'
 import { erc20Abi, formatUnits } from 'viem'
@@ -34,8 +34,8 @@ import { getTierName, getTierColor } from '@/lib/abstract/tier-colors'
 import { countClaimedBadges, getDisplayName, portalProfileUrl } from '@/lib/abstract/get-user-profile'
 import { AbstractProfile } from '@/components/abstract/abstract-profile'
 import { appChain, penguAddress } from '@/lib/chains'
-import { isEmbeddedBrowser } from '@/lib/wallet/embedded-browser'
 import { toast } from 'sonner'
+import { useAgwLogin } from '@/hooks/use-agw-login'
 
 function shortAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
@@ -84,12 +84,12 @@ export function ConnectWalletButton() {
 function AgwConnectButton() {
   const { t, lang, tf, fmt } = useI18n()
   const { address, isConnected, chainId } = useAccount()
-  const { login, logout: agwLogout } = useLoginWithAbstract()
+  const { logout: agwLogout } = useLoginWithAbstract()
   const { switchChain, isPending: isSwitching } = useSwitchChain()
   const signIn = useWalletSignIn()
   const logout = useLogout()
   const session = useSession()
-  const [loginOpening, setLoginOpening] = useState(false)
+  const { openAgwLogin, loginOpening } = useAgwLogin()
   const { data: portalProfile } = useAbstractProfile()
   const hasPortalProfile = !!portalProfile?.user
 
@@ -123,41 +123,6 @@ function AgwConnectButton() {
 
   const signInState =
     isConnected && !authed && signIn.isPending ? t.auth.signingIn : null
-
-  const openAgwLogin = async () => {
-    // Popup-safety (official AGW/Privy guidance): in-app browsers
-    // (Telegram/Instagram/…) block wallet popups — warn before attempting,
-    // but still try, since some in-app browsers do allow the iframe modal.
-    if (isEmbeddedBrowser()) toast.warning(t.auth.embeddedBrowserHint, { duration: 8000 })
-    setLoginOpening(true)
-    // Dead-stack guard: if the AGW backend died AFTER the gate probe
-    // (e.g. network dropped mid-session), login() hangs with no modal.
-    // Detect that after a grace period and surface an actionable hint
-    // instead of a stuck "Connecting…" spinner.
-    let deadStack = false
-    const guard = setTimeout(() => {
-      const modalPresent = document.querySelector(
-        'iframe[src*="privy"], iframe[title*="Privy" i]',
-      )
-      if (!modalPresent) {
-        deadStack = true
-        setLoginOpening(false)
-        toast.error(t.auth.walletUnavailableHint)
-      }
-    }, 12_000)
-    try {
-      await login()
-    } catch (err) {
-      const msg = (err as Error)?.message ?? ''
-      if (/fetch|network|timeout|abort/i.test(msg)) {
-        toast.error(t.auth.walletUnavailableHint)
-      }
-      // Otherwise the user closed the AGW modal before finishing — nothing to report.
-    } finally {
-      clearTimeout(guard)
-      if (!deadStack) setLoginOpening(false)
-    }
-  }
 
   if (!isConnected) {
     return (

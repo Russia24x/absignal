@@ -52,21 +52,6 @@ export interface Candle {
   volume: number
 }
 
-export interface SentimentComponent {
-  key: 'trend' | 'rsi' | 'flow' | 'momentum' | 'macd' | 'volatility'
-  score: number
-  detail: string
-}
-
-export interface SentimentResult {
-  score: number
-  zone: 'extremeFear' | 'fear' | 'neutral' | 'greed' | 'extremeGreed'
-  delta: number | null
-  components: SentimentComponent[]
-  stale: boolean
-  updatedAt: number
-}
-
 export interface IndicatorDetail {
   key: string
   vote: 'bullish' | 'bearish' | 'neutral'
@@ -202,15 +187,6 @@ export function useCandles(tf: string) {
         `/api/market/candles?tf=${tf}&limit=180`
       ),
     refetchInterval: 90_000,
-  })
-}
-
-export function useMarketSentiment() {
-  return useQuery({
-    queryKey: ['market-sentiment'],
-    queryFn: () => jget<SentimentResult>('/api/market/sentiment'),
-    refetchInterval: 60_000,
-    retry: 1,
   })
 }
 

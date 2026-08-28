@@ -80,7 +80,7 @@ export function Footer() {
   const showVoteBanner = votingSupported // enabled via NEXT_PUBLIC_ABSTRACT_APP_ID
 
   return (
-    <footer className="mt-auto border-t border-border/40 bg-[#050d16]/80 backdrop-blur-md">
+    <footer className="mt-auto border-t border-border bg-card/40">
       {/* Abstract Portal upvote banner — rendered once the app is listed */
       showVoteBanner && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 pt-6">
@@ -113,14 +113,14 @@ export function Footer() {
           {/* Links */}
           <div className="space-y-2 text-sm">
             <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-3 pt-1.5">{t.brand}</h3>
-            <a href="#features" className="block text-muted-foreground hover:text-foreground transition-colors">
-              {t.nav.features}
+            <a href="#signal" className="block text-muted-foreground hover:text-foreground transition-colors">
+              {t.nav.signal}
+            </a>
+            <a href="#performance" className="block text-muted-foreground hover:text-foreground transition-colors">
+              {t.nav.performance}
             </a>
             <a href="#pricing" className="block text-muted-foreground hover:text-foreground transition-colors">
               {t.nav.pricing}
-            </a>
-            <a href="#track" className="block text-muted-foreground hover:text-foreground transition-colors">
-              {t.nav.track}
             </a>
             <a href="#faq" className="block text-muted-foreground hover:text-foreground transition-colors">
               {t.nav.faq}

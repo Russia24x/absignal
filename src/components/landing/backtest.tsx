@@ -238,29 +238,13 @@ export function BacktestSandbox() {
   const totalRTone = (stats?.totalR ?? 0) >= 0 ? 'positive' : 'negative'
 
   return (
-    <section id="backtest" className="relative py-14 sm:py-20">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="mb-8 text-center"
-        >
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-primary/80">
-            {t.backtest.eyebrow}
-          </p>
-          <h2 className="text-2xl font-black tracking-tight sm:text-3xl">{t.backtest.title}</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {t.backtest.subtitle}
-          </p>
-          {data && (
-            <p className="mt-2 text-[11px] text-muted-foreground/70" dir="ltr">
-              {data.from} → {data.to} · {fmt(data.tradingDays)} {t.backtest.days}
-            </p>
-          )}
-        </motion.div>
+    <div>
+      {/* Range note */}
+      {data && (
+        <p className="mb-4 text-[11px] text-muted-foreground/80" dir="ltr">
+          {data.from} → {data.to} · {fmt(data.tradingDays)} {t.backtest.days}
+        </p>
+      )}
 
         {isLoading && (
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -436,7 +420,6 @@ export function BacktestSandbox() {
             </p>
           </>
         )}
-      </div>
-    </section>
+    </div>
   )
 }
