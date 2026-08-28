@@ -44,7 +44,10 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
+  // node_modules/.next are lint-ignored; .open-next/.wrangler are OpenNext
+  // build output (multi-MB bundles that OOM the parser), upload/ holds
+  // owner-supplied patch files, tool-results/ holds QA captures.
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills", ".open-next/**", ".wrangler/**", "upload/**", "tool-results/**", "agent-ctx/**"]
 }];
 
 export default eslintConfig;

@@ -6,7 +6,7 @@
  */
 
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
-import { db } from '../src/lib/db'
+import { getDb } from '../src/lib/db'
 
 const BASE = 'http://127.0.0.1:3000'
 
@@ -22,6 +22,7 @@ function pass(name: string, condition: boolean, detail = '') {
 }
 
 async function main() {
+  const db = await getDb()
   const account = privateKeyToAccount(generatePrivateKey())
   console.log(`\n🔑 Test wallet: ${account.address}\n`)
 

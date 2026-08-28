@@ -82,6 +82,21 @@ All knobs live at the top of `src/lib/analysis/engine.ts`:
    21-day pre-launch window). Read `scripts/engine-v2-validation.ts`'s header
    before touching weights.
 
+### Verify the Cloudflare Workers path locally (D1)
+
+`bun run dev` stays on SQLite by design (see `src/lib/db.ts`). Before a
+Workers deploy, exercise the real worker + D1 stack:
+
+```bash
+cp .dev.vars.example .dev.vars            # + real SESSION_SECRET
+npx wrangler d1 migrations apply pengusignal --local
+bun run preview                            # worker on http://localhost:8787
+```
+
+Check `/api/config` (`configOk: true`), `/api/signal/history` (backfills
+into local D1), `/api/signal/today` (`auth_required`). Full details in
+[DEPLOYMENT.md §1.4](DEPLOYMENT.md).
+
 ### Inspect today's locked signal (admin)
 
 ```bash
@@ -110,6 +125,9 @@ sqlite3 db/custom.db "SELECT date, verdict, score, confidence, engine, backfille
 | Chart empty for a timeframe | pool has fewer candles than requested | wait — GeckoTerminal indexes new pools progressively |
 | A brand-new DB column (e.g. after adding a field to the schema + `db:push`) comes back `null`/missing from the API | the running dev server holds a stale Prisma client in memory | restart the dev server (`bun run dev`) — bitten twice in R25/R26 |
 | Track record shows an old engine version on recent days | expected — rows are stamped at lock time and never rewritten | nothing to fix; new locks pick up the current `ENGINE_VERSION` automatically |
+| Worker logs "Prisma Client could not locate the Query Engine" | `serverExternalPackages` missing the Prisma entries, or `@prisma/adapter-d1` major ≠ `@prisma/client` major | restore `serverExternalPackages: ["@prisma/client", ".prisma/client"]` (next.config.ts) and the 6.x adapter → rebuild |
+| ~50 `unknown` typecheck errors appeared | `cloudflare-env.d.ts` regenerated with runtime types | `bun run cf-typegen` (passes `--include-runtime=false`) |
+| `bun run lint` crashes with heap OOM | eslint parsing build output | keep `.open-next/**` / `.wrangler/**` in `eslint.config.mjs` ignores |
 
 ## Release checklist
 

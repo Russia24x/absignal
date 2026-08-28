@@ -14,7 +14,7 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual, createHash } from 'crypto'
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { authConfig } from '@/lib/config'
 
 function sessionSecret(): string {
@@ -80,6 +80,7 @@ export async function createNonce(
   ].join('\n')
   // The exact message is stored verbatim — the verify step compares against
   // this string, so there is zero reconstruction drift.
+  const db = await getDb()
   await db.authNonce.create({
     data: { address: address.toLowerCase(), nonce, message, expiresAt },
   })
@@ -88,6 +89,7 @@ export async function createNonce(
 
 /** Consume a nonce (marks used). Returns the bound address or null. */
 export async function consumeNonce(nonce: string): Promise<string | null> {
+  const db = await getDb()
   const record = await db.authNonce.findUnique({ where: { nonce } })
   if (!record) return null
   if (record.usedAt || record.expiresAt.getTime() < Date.now()) return null
@@ -97,6 +99,7 @@ export async function consumeNonce(nonce: string): Promise<string | null> {
 
 /** Look up the exact stored message for a pending nonce. */
 export async function getPendingNonceMessage(address: string): Promise<{ nonce: string; message: string } | null> {
+  const db = await getDb()
   const record = await db.authNonce.findFirst({
     where: { address, usedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: 'desc' },
@@ -122,6 +125,7 @@ export async function createSession(
   const secret = randomBytes(32).toString('hex')
   const tokenHash = sha256(secret)
   const expiresAt = new Date(Date.now() + authConfig.sessionTtlMs)
+  const db = await getDb()
   await db.session.create({
     data: {
       userId,
@@ -145,6 +149,7 @@ export async function getSessionUser(cookieValue: string | undefined): Promise<S
   const [sessionId, secret, sig] = parts
   if (!safeEqual(sig, hmac(`${sessionId}.${secret}`))) return null
   const tokenHash = sha256(secret)
+  const db = await getDb()
   const session = await db.session.findUnique({
     where: { tokenHash },
     include: { user: true },
@@ -170,6 +175,7 @@ export async function destroySession(cookieValue: string | undefined): Promise<v
   const parts = cookieValue.split('.')
   if (parts.length !== 3) return
   const secret = parts[1]
+  const db = await getDb()
   await db.session.delete({ where: { tokenHash: sha256(secret) } }).catch(() => {})
 }
 

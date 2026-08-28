@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { getSignalHistory } from '@/lib/signal/daily'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
 
@@ -32,6 +32,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'not_resolved' }, { status: 403 })
     }
 
+    const db = await getDb()
     const row = await db.dailySignal.findUnique({ where: { date } })
     if (!row) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 

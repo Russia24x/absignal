@@ -2,7 +2,8 @@
 // SQLite locally; see docs/DEPLOYMENT.md for the Cloudflare (Turso/D1) path.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters", "queryCompiler"]
 }
 
 datasource db {

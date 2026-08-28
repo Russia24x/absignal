@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { getSessionUser, cookieFromRequest } from '@/lib/auth/session'
 import {
   subscriptionPackages,
@@ -44,6 +44,7 @@ export async function POST(req: Request) {
   }
 
   const amountWei = penguToWei(pkg.price)
+  const db = await getDb()
   const intent = await db.paymentIntent.create({
     data: {
       userId: user.id,

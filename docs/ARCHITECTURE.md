@@ -40,6 +40,7 @@ This document explains the system end-to-end so future developers can extend it 
 | Path | Responsibility |
 |---|---|
 | `src/lib/config.ts` | Single source of truth. Reads every env var, validates, exports typed config. **No other module reads `process.env` for app config.** |
+| `src/lib/db.ts` | `getDb()` — the dual-backend Prisma factory: inside the deployed OpenNext worker it resolves the D1 binding via **sync** `getCloudflareContext()` + `PrismaD1`; everywhere else (dev, e2e scripts, self-hosted Node) it falls back to SQLite via `DATABASE_URL`. Never import a module-level client. |
 | `src/lib/chains.ts` | Client-side viem chain definitions (Abstract 2741 / Testnet 11124). |
 | `src/lib/market/geckoterminal.ts` | Market data client with in-memory TTL cache (respects the free tier's ~30 req/min). |
 | `src/lib/analysis/indicators.ts` | Pure, deterministic indicator math (EMA, SMA, RSI-Wilder, MACD, Bollinger, Stochastic, ATR, ADX/DI, OBV slope, ROC, swing levels). |
@@ -149,3 +150,9 @@ published, not hidden. This turns engine upgrades into visible, auditable events
   which matters once deployed to Cloudflare).
 - The in-memory caches are per-process; on Cloudflare Workers, swap them for the
   Cache API or KV — see DEPLOYMENT.md.
+- **Database backend is runtime-detected, never configured**: production Workers
+  get D1 (`getCloudflareContext()` → `PrismaD1`), everything else gets SQLite.
+  `next.config.ts` keeps `@prisma/client` + `.prisma/client` in
+  `serverExternalPackages` so OpenNext bundles the WASM-engine client for
+  workerd — without it the worker tries to load the Rust engine and dies.
+  Local test of the full Workers stack: `bun run preview` (see DEPLOYMENT.md §1.4).

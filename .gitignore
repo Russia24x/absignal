@@ -69,3 +69,14 @@ Caddyfile
 /tests/
 agent-ctx/tool-results/
 tool-results/
+
+# OpenNext
+.open-next
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+
+# owner-supplied patch artifacts (applied & archived in git history)
+/upload/

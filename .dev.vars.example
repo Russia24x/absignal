@@ -1,0 +1,21 @@
+# Local secrets for `bun run preview` (the real OpenNext worker on :8787).
+# Copy to .dev.vars and fill from your .env — everything EXCEPT DATABASE_URL
+# (on Workers the D1 binding replaces it; db.ts never reads DATABASE_URL there).
+#
+# The production equivalents are set as Worker secrets/vars:
+#   npx wrangler secret put SESSION_SECRET   (encrypted — REQUIRED)
+#   vars in the dashboard or wrangler.jsonc for the public config values.
+NEXT_PUBLIC_APP_NETWORK=mainnet
+NEXT_PUBLIC_RPC_MAINNET=https://api.mainnet.abs.xyz
+NEXT_PUBLIC_RPC_TESTNET=https://api.testnet.abs.xyz
+NEXT_PUBLIC_PENGU_MAINNET=0x9ebe3a824ca958e4b3da772d2065518f009cba62
+NEXT_PUBLIC_PENGU_TESTNET=
+NEXT_PUBLIC_TREASURY_ADDRESS=0x60Df4E186364c3a49A550Aee29Da1d5fe3658818
+GECKOTERMINAL_NETWORK=abstract
+GECKOTERMINAL_POOL=0xda7d037fda848177141e037f9d0c67cae7b53262
+SUBSCRIPTION_1D_PRICE_PENGU=10
+SUBSCRIPTION_7D_PRICE_PENGU=65
+SUBSCRIPTION_30D_PRICE_PENGU=255
+SUBSCRIPTION_365D_PRICE_PENGU=2750
+SUBSCRIPTION_LIFETIME_PRICE_PENGU=7650
+SESSION_SECRET=change-me-min-32-chars-long-random-hex

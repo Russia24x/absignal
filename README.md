@@ -175,6 +175,12 @@ bun run lint              # ESLint
 bun run typecheck         # TypeScript (strict, app + scripts)
 ```
 
+> Local `bun run dev` runs on SQLite. To test the production Cloudflare
+> Workers + D1 stack locally: `cp .dev.vars.example .dev.vars` (add your
+> `SESSION_SECRET`), `npx wrangler d1 migrations apply pengusignal --local`,
+> then `bun run preview` → the real worker on `http://localhost:8787`
+> (see [docs/DEPLOYMENT.md §1.4](docs/DEPLOYMENT.md)).
+
 The E2E suite generates a throwaway wallet and exercises the real flow end-to-end:
 nonce issuance, signature verification, replay/forgery rejection, session lifecycle,
 the entitlement ladder, plan-based payment intents (exact amounts), on-chain

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createPublicClient, http } from 'viem'
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { consumeNonce, createSession, cookieFromRequest, getPendingNonceMessage } from '@/lib/auth/session'
 import { authConfig, chain, networkMode, serverRpcUrl } from '@/lib/config'
 import { abstract, abstractTestnet } from '@/lib/chains'
@@ -85,6 +85,7 @@ export async function POST(req: Request) {
   }
 
   // Upsert user.
+  const db = await getDb()
   const user = await db.user.upsert({
     where: { address },
     create: { address },

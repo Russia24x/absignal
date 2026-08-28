@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { getSessionUser, cookieFromRequest } from '@/lib/auth/session'
 import { verifyPaymentTx } from '@/lib/payments/onchain'
 import { isLifetimeUntil, planIdForDays, LIFETIME_SENTINEL_MS } from '@/lib/config'
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'missing_fields' }, { status: 400 })
   }
 
+  const db = await getDb()
   const intent = await db.paymentIntent.findUnique({ where: { id: intentId } })
   if (!intent || intent.userId !== user.id) {
     return NextResponse.json({ error: 'intent_not_found' }, { status: 404 })

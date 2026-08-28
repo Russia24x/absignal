@@ -94,6 +94,13 @@ free growth: portal ranking drives discovery.
 
 ## 1. One-time repo preparation (Cloudflare paths A & B)
 
+> ✅ **Status (R28): DONE and committed.** The repo already contains every
+> file below — `wrangler.jsonc` (worker `pengusignal`, D1 binding to the real
+> database `aa91256d-98f1-4d81-b294-2a34b0c4ebb3` created by the owner),
+> `open-next.config.ts`, `public/_headers`, `cloudflare-env.d.ts`, the D1
+> adapter wiring, and `migrations/0001_init.sql`. This section documents
+> HOW they were produced — for reference, rebuilds, or a fresh environment.
+
 The app runs on **Cloudflare Workers** via
 [OpenNext Cloudflare](https://opennext.js.org/cloudflare) — the official
 Next.js adapter. Run these steps **once**, locally, then commit the results:
@@ -101,14 +108,14 @@ Next.js adapter. Run these steps **once**, locally, then commit the results:
 ### 1.1 Install the adapter
 
 ```bash
-npm install -D @opennextjs/cloudflare
+npm install -D @opennextjs/cloudflare wrangler
 npx opennextjs-cloudflare init
 ```
 
 `init` generates `wrangler.jsonc` (with the required `nodejs_compat`
-compatibility flag) and adds `preview` / `deploy` scripts to
-`package.json`. **Commit both changes** — the Workers Builds pipeline
-(path B) relies on them being in the repo.
+compatibility flag) and adds `preview` / `deploy` scripts to `package.json`.
+**Commit both changes** — the Workers Builds pipeline (path B) relies on
+them being in the repo.
 
 ### 1.2 Create the production database (D1)
 
@@ -135,12 +142,21 @@ Copy the printed `database_id` into `wrangler.jsonc`:
 
 ### 1.3 Switch Prisma to the D1 adapter
 
+⚠️ **Corrected (R28).** An earlier draft of this section suggested reading the
+D1 binding from `process.env.DB` — that **does not work** with OpenNext
+Cloudflare. The binding is only reachable via `getCloudflareContext()`, and
+the whole switch has four moving parts (all now in the repo):
+
+**(a) Matching package versions.** The adapter must match `@prisma/client`'s
+major version — the Prisma 6 client needs the 6.x adapter:
+
 ```bash
-npm install @prisma/adapter-d1
+npm install @prisma/adapter-d1@^6.19.3   # NOT v7 — that targets Prisma 7
 ```
 
-`prisma/schema.prisma` — enable adapter + query-compiler mode (the Rust
-engine binary cannot run on Workers):
+**(b) Schema flags** (`prisma/schema.prisma`) — adapter + query-compiler mode
+(the Rust engine binary cannot run on Workers). Do NOT set an `output`
+directory: OpenNext patches the default-generated client at build time.
 
 ```prisma
 generator client {
@@ -149,32 +165,73 @@ generator client {
 }
 ```
 
-`src/lib/db.ts` — use the binding when present (keeps local SQLite dev
-working unchanged):
+**(c) `src/lib/db.ts` — per-request `getDb()`, not a module-level client.**
+Both the Workers D1 path and the SQLite fallback (local dev, e2e scripts,
+self-hosted) live behind one function. SYNC `getCloudflareContext()` is
+deliberate — see the file's docblock for the full rationale:
 
 ```ts
 import { PrismaClient } from '@prisma/client'
 import { PrismaD1 } from '@prisma/adapter-d1'
 
-export const db = new PrismaClient({
-  // env.DB is injected by Workers; undefined in local dev
-  ...(process.env.DB ? { adapter: new PrismaD1(process.env.DB as any) } : {}),
-})
+export async function getDb(): Promise<PrismaClient> {
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare')
+    const { env } = getCloudflareContext()   // sync — only resolves inside the deployed worker
+    if (env?.DB) return new PrismaClient({ adapter: new PrismaD1(env.DB) })
+  } catch { /* not on Workers */ }
+  // …SQLite fallback via DATABASE_URL (unchanged local dev)
+}
 ```
 
-Regenerate the client and create the schema as SQL:
+Every consumer (`session.ts`, `daily.ts`, 4 API routes, `scripts/e2e-auth.ts`)
+calls `const db = await getDb()` at the top of its function.
+
+**(d) `next.config.ts` — keep Prisma external** (official OpenNext recipe,
+[opennext.js.org/cloudflare/howtos/db](https://opennext.js.org/cloudflare/howtos/db)).
+Without this, Next bundles `@prisma/client` with NODE conditions (the
+Rust-engine client) and the worker dies with
+*"Prisma Client could not locate the Query Engine"*:
+
+```ts
+const nextConfig: NextConfig = {
+  serverExternalPackages: ["@prisma/client", ".prisma/client"],
+}
+```
+
+Then regenerate the client, the binding types, and the initial migration
+(all committed — re-run only when the schema changes):
 
 ```bash
 npx prisma generate
+bun run cf-typegen        # wrangler types --include-runtime=false …
 npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma \
   --script --output migrations/0001_init.sql
 ```
 
-Commit `migrations/0001_init.sql` and the schema change.
+> **`--include-runtime=false` matters:** with runtime types included, the
+> generated file redefines the global `Response` (15k lines), which changes
+> `Response.json()` to `unknown` project-wide and breaks ~50 call sites.
 
 > Prefer staying closer to SQLite semantics? **Turso** (libSQL) works with
-> `@prisma/adapter-libsql` and the same schema — swap the adapter in the
-> snippet above.
+> `@prisma/adapter-libsql` and the same schema — swap the adapter in
+> `getDb()`.
+
+### 1.4 Test the Workers/D1 path locally (before deploying)
+
+`bun run dev` deliberately stays on SQLite (see `src/lib/db.ts`). To exercise
+the REAL worker + D1 stack locally:
+
+```bash
+cp .dev.vars.example .dev.vars    # then paste your real SESSION_SECRET
+npx wrangler d1 migrations apply pengusignal --local   # schema into local D1
+bun run preview                   # builds the worker, serves it on http://localhost:8787
+```
+
+Verify: `/api/config` → `configOk: true`, `/api/signal/history` → backfills
+~21 days into local D1 (every row stamped with the current engine version),
+`/api/signal/today` → `auth_required` (paywall intact). This exact flow was
+used to validate the stack end-to-end before the first deploy.
 
 ---
 
@@ -393,10 +450,13 @@ Run these **against the live URL** before announcing anything:
 | `config error` from every API route | `SESSION_SECRET` missing → set as encrypted secret, redeploy |
 | Build fails on Workers Builds | §1 changes not committed/pushed (missing `wrangler.jsonc`) |
 | `P2010 / adapter` Prisma errors | `prisma generate` not run with `driverAdapters` + `queryCompiler`, or D1 binding name ≠ `DB` |
-| Empty signal history | D1 migration not applied → §2.2 / §3.5 |
+| "Prisma Client could not locate the Query Engine" (on the worker) | `serverExternalPackages` missing `"@prisma/client", ".prisma/client"` in `next.config.ts`, or adapter major ≠ client major (needs 6.x with `@prisma/client@6`) → fix and rebuild |
+| ~50 `TS18046: … is of type 'unknown'` errors after regenerating types | `cloudflare-env.d.ts` was regenerated WITH runtime types → run `bun run cf-typegen` (which passes `--include-runtime=false`) |
+| `bun run lint` dies with `JavaScript heap out of memory` | eslint is parsing build output → `.open-next/**`/`.wrangler/**` must stay in the ignores list of `eslint.config.mjs` |
+| Empty signal history (on the deployed worker) | D1 migration not applied remotely → `npx wrangler d1 migrations apply pengusignal --remote` |
 | Market data 502s | GeckoTerminal throttling — transient, self-heals via cache; see §7 swap points |
 | Wallet connect blocked | `NEXT_PUBLIC_APP_NETWORK`/RPC vars missing at **build** time (public vars are inlined) → set vars → rebuild |
 
 ---
 
-*Deployment target reference: Cloudflare Workers + OpenNext (`@opennextjs/cloudflare`), D1 database, free plan. Tested shapes: Next.js 16 App Router, Prisma 6, wagmi/AGW client-side.*
+*Deployment target reference: Cloudflare Workers + OpenNext (`@opennextjs/cloudflare`), D1 database (`pengusignal`, id `aa91256d-98f1-4d81-b294-2a34b0c4ebb3`), free plan. Tested shapes: Next.js 16 App Router, Prisma 6 + `@prisma/adapter-d1` 6.x (WASM engine via workerd conditions), wagmi/AGW client-side. The full Workers stack — build, D1 queries, backfill, auth paywall — was validated locally with `bun run preview` (R28).*

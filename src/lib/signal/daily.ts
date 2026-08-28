@@ -10,7 +10,7 @@
  * producing a real, data-driven accuracy score — no demo numbers.
  */
 
-import { db } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { runAnalysis, ENGINE_VERSION, type AnalysisResult } from '@/lib/analysis/engine'
 import { getDailyCloses } from '@/lib/market/geckoterminal'
 
@@ -21,6 +21,7 @@ export function utcDate(d: Date = new Date()): string {
 /** Get (or compute + lock) today's signal. */
 export async function getTodaySignal(): Promise<AnalysisResult> {
   const date = utcDate()
+  const db = await getDb()
   const existing = await db.dailySignal.findUnique({ where: { date } })
   if (existing) {
     return JSON.parse(existing.dataJson) as AnalysisResult
@@ -76,6 +77,7 @@ export interface HistoryResult {
 
 /** Public track record: locked signals × real outcomes. */
 export async function getSignalHistory(limit = 30): Promise<HistoryResult> {
+  const db = await getDb()
   const signals = await db.dailySignal.findMany({
     orderBy: { date: 'desc' },
     take: limit,
@@ -167,6 +169,7 @@ export async function backfillHistory(): Promise<number> {
   // against historical windows. This produces honest "what would the engine
   // have said" data derived purely from real historical candles.
   try {
+    const db = await getDb()
     const count = await db.dailySignal.count()
     if (count > 0) return 0
     const { getCandles } = await import('@/lib/market/geckoterminal')
@@ -199,6 +202,10 @@ export async function backfillHistory(): Promise<number> {
             score,
             confidence: 50,
             backfilled: true,
+            // Stamp the generation that ACTUALLY computed this row — a fresh
+            // production backfill today runs the current engine (v2+), and the
+            // versioned track record must never mislabel which engine spoke.
+            engine: ENGINE_VERSION,
             dataJson: JSON.stringify({
               date,
               generatedAt: day.time * 1000,
