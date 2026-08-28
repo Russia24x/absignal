@@ -1,0 +1,119 @@
+// PenguSignal — database schema
+// SQLite locally; see docs/DEPLOYMENT.md for the Cloudflare (Turso/D1) path.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A wallet-based account. Created on first successful signature sign-in.
+model User {
+  id               String    @id @default(cuid())
+  /// Lowercase EVM address (0x…)
+  address          String    @unique
+  /// One-time platform access (5 PENGU by default)
+  accessGranted    Boolean   @default(false)
+  accessGrantedAt  DateTime?
+  /// Active subscription end (inclusive); null = no subscription
+  subscriptionUntil DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  sessions         Session[]
+  paymentIntents   PaymentIntent[]
+  signalUnlocks    SignalUnlock[]
+}
+
+/// Single-use sign-in nonces (replay protection for wallet signatures).
+model AuthNonce {
+  id        String    @id @default(cuid())
+  address   String
+  nonce     String    @unique
+  /// Exact message the wallet must sign (stored verbatim — zero drift).
+  message   String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([address, expiresAt])
+}
+
+/// Server-side sessions. The cookie carries `<id>.<secret>`; we store a hash.
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// A payment intent: expected PENGU amount, later matched to an on-chain tx.
+model PaymentIntent {
+  id              String    @id @default(cuid())
+  userId          String
+  /// ACCESS | SIGNAL_DAY | SUBSCRIPTION
+  type            String
+  /// For SUBSCRIPTION: number of days purchased
+  days            Int?
+  /// Expected amount in PENGU wei (string — SQLite-safe)
+  amountWei       String
+  /// PENDING | PAID | EXPIRED
+  status          String    @default("PENDING")
+  /// On-chain hash that settled this intent (unique — prevents reuse)
+  txHash          String?   @unique
+  chainId         Int
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  creditedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+}
+
+/// The locked daily signal (one row per UTC day) — the product itself.
+model DailySignal {
+  id             String   @id @default(cuid())
+  /// UTC date, yyyy-mm-dd
+  date           String   @unique
+  /// STRONG_BUY | BUY | HOLD | SELL | STRONG_SELL
+  verdict        String
+  /// Composite score, -100..100
+  score          Float
+  /// 0..100
+  confidence     Float
+  /// Full analysis snapshot (JSON string)
+  dataJson       String
+  /// PENGU price (USD) at computation time
+  priceAtSignal  Float
+  createdAt      DateTime @default(now())
+
+  @@index([date])
+}
+
+/// Per-user per-day unlocks bought with 1 PENGU.
+model SignalUnlock {
+  id         String   @id @default(cuid())
+  userId     String
+  /// UTC date, yyyy-mm-dd
+  signalDate String
+  intentId   String   @unique
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, signalDate])
+  @@index([signalDate])
+}
