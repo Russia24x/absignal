@@ -687,3 +687,34 @@ Stage Summary:
 - One real remaining issue found & fixed: BigInt literal vs ES2017 target (latent build breaker) — commit 14ea154; full-project tsc now 100% clean for the first time (also excluded non-app template folders)
 - All gates green: e2e 22/22, lint, tsc 0 errors, exact-wei math, zero console errors
 - Unresolved/next-phase (owner-gated): funded-wallet live payment smoke test; deployment hold lift (docs/DEPLOYMENT.md banner); roadmap: Telegram/email alerts, optional Session Keys via the intent/verify seam
+
+---
+Task ID: 19
+Agent: orchestrator (main)
+Task: Owner request (Persian) — pause the roadmap; focus on deployment preparation and fixing current issues WITHOUT new features or extra engineering; simplify toward production; professionally clean/polish the code for modular maintenance; clean GitHub repo; manual + dash.cloudflare deployment guides + Cloudflare↔GitHub connection; review the real product output.
+
+Work Log:
+- SCOPE HELD: zero new features, zero new app code paths — cleanup, docs, and verification only.
+- REPO ASSESSMENT: 152 tracked files, well-structured (src/lib domains, src/components per surface, docs/); no template noise tracked (examples/, skills/ are untracked sandbox dirs); hygiene sweep found ZERO console.log / TODO / FIXME / commented-out-code in src/.
+- DEAD-CODE PURGE (the big cleanup):
+  • ui/ folder 48 → 17 files: deleted 31 unused shadcn template components, every remaining file verified imported by app code (rg reference counts 0/0 for all deleted)
+  • Killed the dead radix-toast chain: ui/toast + ui/toaster + hooks/use-toast (app uses sonner exclusively — providers mounts ui/sonner Toaster)
+  • Deleted hooks/use-mobile.ts (only consumer was the removed sidebar)
+- DEPENDENCY DIET: package.json renamed nextjs_tailwind_shadcn_ts → pengusignal, version 1.0.0, description added, + `typecheck` script. Removed 42 unused deps (71 → 29): dnd-kit×3, @mdxeditor/editor, next-auth, next-intl, recharts, react-hook-form + @hookform/resolvers, react-day-picker, react-markdown, react-syntax-highlighter, react-resizable-panels, embla, cmdk, input-otp, vaul, date-fns, uuid, zod, zustand, sharp, z-ai-web-dev-sdk, @reactuses/core, @tanstack/react-table, + 17 unused @radix-ui packages. Every removal verified 0 imports (kept next-themes — used by ui/sonner).
+  • bun install: lockfile updated, 42 packages pruned from node_modules, dev server unaffected (unused modules were never in the graph)
+- CONFIG POLISH: next.config.ts dropped typescript.ignoreBuildErrors:true (tsc is clean since Round 18 — builds now fail fast on type errors; the flag was masking the Round-18 BigInt bug class) + removed template comment; .gitignore deduped (.env block ×2 → ×1, grouped + labeled sections)
+- DEPLOYMENT DOCS (hold LIFTED per owner decision — this round's core ask):
+  • docs/DEPLOYMENT.md fully rewritten: Path A manual Wrangler CLI deploy; Path B dash.cloudflare.com + GitHub connection via Workers Builds (step-by-step: GitHub App install & repo grant, build/deploy commands, full variables+secrets table, D1 migration step, day-2 ops — auto-deploy/preview branches/rollback/logs, disconnect procedure); Path C self-hosted standalone (npm run build && npm run start, already wired via output:standalone); plus pre-deploy gates table, custom-domain section, 8-point post-deploy verification checklist, free-tier limits/swap-points table, troubleshooting table
+  • Fixed a factual bug in the old guide: Prisma D1 adapter import was `@prisma/d1` (nonexistent package) → corrected to `@prisma/adapter-d1` + driverAdapters/queryCompiler preview features (Rust engine can't run on Workers)
+  • README deployment section: ON-HOLD note → GO with the 3 paths; Testing section now `bun run typecheck`
+  • docs/AUDIT.md §5: HALTED → hold LIFTED (Round 19) with history preserved; docs/MAINTENANCE.md release checklist: +typecheck +deploy step
+- PRODUCT REVIEW (بررسی محصول واقعی): FA default hero → VLM 9.2/10 "APPROVED FOR DEPLOY — green light" (RTL zero LTR contamination, countdown monospace alignment, WCAG-AA contrast, glass effects clean); gated signal card → VLM 9/10 (locked teaser communicates value without leaking, plan grid legible); VLM's v1.1 suggestions (CTA on card, footer contrast) noted but NOT implemented — out of scope per the no-new-features mandate
+- FULL VERIFICATION POST-PURGE: tsc 0 errors · lint clean · e2e-auth 22/22 PASS · browser QA EN+FA (12 sections, 21 canvases) · mobile 390px scrollWidth=390 zero overflow · console 0 errors after full interaction pass · dev.log all 200s with live market data
+- Git: committed 172e740, pushed to github.com/Russia24x/absignal (f47a124..172e740, local == origin/main, no force push per RULES.md)
+
+Stage Summary:
+- Production-readiness pass complete with NO new features: 33 dead files deleted, 42 unused dependencies removed (71→29), build type-checking re-enabled, package identity fixed
+- Deployment hold lifted; complete go-live runbook delivered for all three paths (manual Wrangler / dashboard+GitHub auto-deploy / self-hosted), with the Prisma-D1 factual bug corrected
+- Product verified as deployable: all gates green, VLM go-live review 9.2/10 hero + 9/10 paywall
+- GitHub repo is clean, in sync, and professional (152 files, all used, documented structure)
+- Remaining for the OWNER (documented in DEPLOYMENT.md): run §1 one-time repo prep on a machine with wrangler (opennextjs init + D1 create + Prisma adapter switch — intentionally NOT committed blind from the sandbox since the D1 database_id is account-specific), generate SESSION_SECRET, fund treasury, then §6 post-deploy verification
