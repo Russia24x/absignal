@@ -93,6 +93,8 @@ export interface SessionUser {
   address: string
   accessGranted: boolean
   subscriptionUntil: Date | null
+  /** Last credited plan id: day | week | month | year | lifetime */
+  subscriptionPlan: string | null
 }
 
 /** Create a DB-backed session and return the cookie value to set. */
@@ -141,6 +143,7 @@ export async function getSessionUser(cookieValue: string | undefined): Promise<S
     address: session.user.address,
     accessGranted: session.user.accessGranted,
     subscriptionUntil: session.user.subscriptionUntil,
+    subscriptionPlan: session.user.subscriptionPlan,
   }
 }
 

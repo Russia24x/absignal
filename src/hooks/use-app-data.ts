@@ -17,8 +17,7 @@ export interface AppConfig {
   chain: { id: number; name: string; shortName: string; rpcUrl: string; blockExplorerUrl: string; blockExplorerTxPath: string }
   penguAddress: string | null
   treasuryAddress: string
-  pricing: { accessFee: number; dailySignal: number; subscription7d: number; subscription30d: number }
-  packages: Array<{ id: string; days: number; label: string; price: number }>
+  packages: Array<{ id: string; days: number | null; label: string; price: number; popular?: boolean }>
   dataSource: { provider: string; network: string; pool: string }
   configOk: boolean
   configErrors: string[]
@@ -110,7 +109,7 @@ export interface SignalData {
 }
 
 export interface SignalTodayResponse {
-  access: 'granted' | 'auth_required' | 'access_fee_required' | 'day_unlock_required'
+  access: 'granted' | 'auth_required' | 'subscription_required'
   date?: string
   updatedAt?: number
   signal?: SignalData
@@ -134,16 +133,20 @@ export interface HistoryResult {
 
 export interface SessionUser {
   address: string
-  accessGranted: boolean
   subscriptionUntil: string | null
+  /** Last credited plan: day | week | month | year | lifetime */
+  subscriptionPlan: string | null
+  isLifetime: boolean
   hasSubscription: boolean
-  unlockedToday: boolean
+  /** Whole days remaining; null for lifetime plans */
+  daysLeft: number | null
   today: string
 }
 
 export interface PaymentIntentResponse {
   intentId: string
-  type: 'ACCESS' | 'SIGNAL_DAY' | 'SUBSCRIPTION'
+  type: 'SUBSCRIPTION'
+  planId: 'day' | 'week' | 'month' | 'year' | 'lifetime'
   days: number | null
   amountPengu: number
   amountWei: string
@@ -342,7 +345,7 @@ export function useLogout() {
 
 export function usePaymentIntent() {
   return useMutation({
-    mutationFn: (payload: { type: 'ACCESS' | 'SIGNAL_DAY' | 'SUBSCRIPTION'; days?: number }) =>
+    mutationFn: (payload: { planId: 'day' | 'week' | 'month' | 'year' | 'lifetime' }) =>
       jpost<PaymentIntentResponse>('/api/payments/intent', payload),
   })
 }

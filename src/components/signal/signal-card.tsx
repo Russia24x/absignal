@@ -2,8 +2,11 @@
 
 /**
  * Today's Signal card — the paid product.
- * Handles the full entitlement ladder (connect → sign → access fee →
- * day unlock / subscription) and renders the complete engine output.
+ * Handles the full entitlement ladder (connect → sign → subscribe) and
+ * renders the complete engine output. Registration & login are free; only
+ * the signal itself sits behind a time-based PENGU subscription
+ * (day / week / month / year / lifetime — plain ERC-20 transfers, no
+ * session keys).
  */
 
 import { useMemo, useState } from 'react'
@@ -16,6 +19,7 @@ import {
   CheckCheck,
   Crown,
   Gauge,
+  Infinity as InfinityIcon,
   Layers,
   Loader2,
   Lock,
@@ -184,17 +188,8 @@ function LockedPreview() {
   )
 }
 
-function LockedState({
-  kind,
-  fee,
-  price,
-}: {
-  kind: 'connect' | 'signing' | 'access' | 'day'
-  fee: number
-  price: number
-}) {
-  const { t, tf } = useI18n()
-  const { isConnected } = useAccount()
+function LockedState({ kind }: { kind: 'connect' | 'signing' | 'subscribe' }) {
+  const { t } = useI18n()
 
   return (
     <div className="flex flex-col items-center text-center gap-4 py-6 px-3 sm:px-4">
@@ -202,8 +197,7 @@ function LockedState({
         <div className="flex size-14 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 glow-frost">
           {kind === 'connect' && <Wallet className="size-6 text-primary" />}
           {kind === 'signing' && <Loader2 className="size-6 text-primary animate-spin" />}
-          {kind === 'access' && <Lock className="size-6 text-primary" />}
-          {kind === 'day' && <Sparkles className="size-6 text-primary" />}
+          {kind === 'subscribe' && <Crown className="size-6 text-primary" />}
         </div>
       </div>
 
@@ -220,28 +214,13 @@ function LockedState({
         </div>
       )}
 
-      {kind === 'access' && (
+      {kind === 'subscribe' && (
         <>
-          <h3 className="text-lg font-bold">{t.signal.accessRequired}</h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            {t.signal.accessRequiredDesc.replace('{fee}', String(fee))}
-          </p>
-          <PayButton type="ACCESS" className="mt-1">
-            {tf(t.signal.payAccess, { fee })}
-          </PayButton>
-        </>
-      )}
-
-      {kind === 'day' && (
-        <>
-          <h3 className="text-lg font-bold">{t.signal.dayUnlockRequired}</h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            {t.signal.dayUnlockRequiredDesc.replace('{price}', String(price))}
-          </p>
-          <PayButton type="SIGNAL_DAY" className="mt-1">
-            {tf(t.signal.payDay, { price })}
-          </PayButton>
-          <SubscriptionRow compact />
+          <h3 className="text-lg font-bold">{t.signal.subscriptionRequired}</h3>
+          <p className="text-sm text-muted-foreground max-w-md">{t.signal.subscriptionRequiredDesc}</p>
+          <div className="w-full max-w-2xl">
+            <PlanGrid />
+          </div>
         </>
       )}
 
@@ -249,33 +228,48 @@ function LockedState({
       <div className="w-full pt-2 border-t border-border/40">
         <LockedPreview />
       </div>
-
-      {!isConnected && kind !== 'connect' && null}
     </div>
   )
 }
 
-function SubscriptionRow({ compact = false }: { compact?: boolean }) {
-  const { t, lang } = useI18n()
+/**
+ * The 5-plan picker (day / week / month / year / lifetime), rendered from
+ * live /api/config — prices are never hardcoded. Also used as the renewal
+ * picker inside SubscriptionStatus.
+ */
+function PlanGrid() {
+  const { t, lang, fmt } = useI18n()
   const { data: config } = useAppConfig()
   const packages = config?.packages ?? []
-  const subs = packages.filter((p) => p.days > 1)
-  const dayWord = lang === 'fa' ? 'روز' : 'days'
-
-  if (!subs.length) return null
+  if (!packages.length) return null
 
   return (
-    <div className={cn('w-full', compact ? 'mt-2' : 'mt-4')}>
+    <div className="w-full">
       <div className="flex items-center gap-3 justify-center text-xs text-muted-foreground">
         <span>{t.sub.title}</span>
       </div>
-      <div className="grid grid-cols-2 gap-2 mt-2 max-w-sm mx-auto">
-        {subs.map((p) => (
-          <PayButton key={p.id} type="SUBSCRIPTION" days={p.days} variant="outline" size="sm" className="w-full">
-            {p.days} {dayWord} · {p.price} PENGU
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-2">
+        {packages.map((p) => (
+          <PayButton
+            key={p.id}
+            planId={p.id as 'day' | 'week' | 'month' | 'year' | 'lifetime'}
+            variant={p.popular ? 'default' : 'outline'}
+            size="sm"
+            className={cn(
+              'h-auto w-full flex-col items-center justify-center gap-0.5 py-2.5 leading-tight',
+              p.popular && 'glow-frost'
+            )}
+          >
+            <span className="text-[11px] font-medium opacity-90">
+              {p.days == null
+                ? t.sub.lifetime
+                : `${fmt(p.days)} ${lang === 'fa' ? 'روز' : p.days === 1 ? 'day' : 'days'}`}
+            </span>
+            <span className="text-sm font-black">{fmt(p.price)} PENGU</span>
           </PayButton>
         ))}
       </div>
+      <p className="mt-2 text-center text-[10px] text-muted-foreground/80">{t.pricing.note}</p>
     </div>
   )
 }
@@ -596,18 +590,36 @@ function NextSignalCountdown() {
 
 /**
  * Subscription lifecycle strip: days remaining, progress, expiry warning
- * and one-click renewal (+7 / +30 days). Renewal days stack on top of the
+ * and the full plan picker for renewal. Renewal days stack on top of the
  * current plan (server-side), so renewing early never loses time.
  *
- * This is the pragmatic alternative to AGW session-key auto-renew: session
- * keys require a mainnet security review + policy-registry listing (see
- * docs/ABSTRACT_PORTAL.md), so we keep the user in control with one-click
- * stacking renewals instead of background charging.
+ * Payments are plain ERC-20 transfers verified on-chain — no session keys,
+ * no auto-charges, no card on file. The user stays in control.
  */
-function SubscriptionStatus({ user }: { user: { subscriptionUntil: string | null } }) {
+function SubscriptionStatus({
+  user,
+}: {
+  user: { subscriptionUntil: string | null; isLifetime?: boolean }
+}) {
   const { t, tf, fmt } = useI18n()
   const until = user.subscriptionUntil ? new Date(user.subscriptionUntil) : null
   if (!until) return null
+
+  if (user.isLifetime) {
+    return (
+      <div className="mb-4 rounded-xl border border-accent/25 bg-accent/5 p-4 flex flex-wrap items-center justify-between gap-2 card-interactive">
+        <div className="flex items-center gap-2 min-w-0">
+          <Crown className="size-4 shrink-0 text-accent" />
+          <span className="text-sm font-semibold truncate">{t.sub.lifetimeActive}</span>
+          <Badge variant="outline" className="gap-1 border-accent/40 text-accent whitespace-nowrap font-mono">
+            <InfinityIcon className="size-3" />
+            {t.sub.foreverBadge}
+          </Badge>
+        </div>
+        <span className="text-xs text-muted-foreground">{t.sub.lifetimeThanks}</span>
+      </div>
+    )
+  }
 
   const msLeft = until.getTime() - Date.now()
   const active = msLeft > 0
@@ -684,18 +696,9 @@ function SubscriptionStatus({ user }: { user: { subscriptionUntil: string | null
       )}
 
       {(expiringSoon || !active) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs text-foreground/75 flex-1 min-w-40 leading-relaxed">
-            {t.signal.renewNote}
-          </p>
-          <div className="flex items-center gap-2">
-            <PayButton type="SUBSCRIPTION" days={7} size="sm" variant="secondary">
-              {t.signal.extend7}
-            </PayButton>
-            <PayButton type="SUBSCRIPTION" days={30} size="sm">
-              {t.signal.extend30}
-            </PayButton>
-          </div>
+        <div className="space-y-2">
+          <p className="text-xs text-foreground/75 leading-relaxed">{t.signal.renewNote}</p>
+          <PlanGrid />
         </div>
       )}
     </div>
@@ -708,30 +711,27 @@ export function SignalCard() {
   const { t } = useI18n()
   const { isConnected } = useAccount()
   const session = useSession()
-  const { data: config } = useAppConfig()
   const { data, isLoading } = useSignalToday(isConnected || !!session.data?.user)
 
   const user = session.data?.user ?? null
 
+  // Entitlement ladder mirrored client-side (the server remains the source
+  // of truth): connect → signing → subscribe (free tier) → full signal.
   const state = useMemo(() => {
-    if (isLoading && isConnected) return 'loading'
+    if (isLoading && !data && (isConnected || user)) return 'loading'
     if (!isConnected && !user) return 'connect'
     if (!user) return 'signing'
-    const access = data?.access
-    if (access === 'access_fee_required' || (!access && !user.accessGranted)) return 'access'
-    if (access === 'day_unlock_required' || (access !== 'granted' && !user.unlockedToday)) return 'day'
-    if (access === 'granted' && data?.signal) return 'full'
-    if (user.accessGranted && user.unlockedToday && data?.signal) return 'full'
-    return 'loading'
-  }, [isLoading, isConnected, user, data])
+    if (user.hasSubscription) return data?.signal ? 'full' : 'loading'
+    return 'subscribe'
+  }, [isLoading, data, isConnected, user])
 
-  const fee = config?.pricing.accessFee ?? 5
-  const price = config?.pricing.dailySignal ?? 1
-
-  const subscriptionActive =
-    user?.hasSubscription && user.subscriptionUntil
-      ? new Date(user.subscriptionUntil).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-      : null
+  const subscriptionLabel = user?.hasSubscription
+    ? user.isLifetime
+      ? t.sub.lifetime
+      : user.subscriptionUntil
+        ? new Date(user.subscriptionUntil).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+        : null
+    : null
 
   return (
     <Card className="glass border-primary/15 overflow-hidden" id="signal">
@@ -742,10 +742,16 @@ export function SignalCard() {
             {t.signal.title}
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            {subscriptionActive && (
+            {subscriptionLabel && (
               <Badge variant="outline" className="border-accent/40 text-accent gap-1">
                 <Crown className="size-3" />
-                {t.signal.activeSubscription} · {t.signal.subscriptionUntil} {subscriptionActive}
+                {user?.isLifetime ? (
+                  subscriptionLabel
+                ) : (
+                  <>
+                    {t.signal.activeSubscription} · {t.signal.subscriptionUntil} {subscriptionLabel}
+                  </>
+                )}
               </Badge>
             )}
             {data?.date && (
@@ -767,10 +773,9 @@ export function SignalCard() {
             <span className="text-sm">{t.signal.loading}</span>
           </div>
         )}
-        {state === 'connect' && <LockedState kind="connect" fee={fee} price={price} />}
-        {state === 'signing' && <LockedState kind="signing" fee={fee} price={price} />}
-        {state === 'access' && <LockedState kind="access" fee={fee} price={price} />}
-        {state === 'day' && <LockedState kind="day" fee={fee} price={price} />}
+        {state === 'connect' && <LockedState kind="connect" />}
+        {state === 'signing' && <LockedState kind="signing" />}
+        {state === 'subscribe' && <LockedState kind="subscribe" />}
         {state === 'full' && data?.signal && <FullSignal signal={data.signal} />}
       </CardContent>
     </Card>

@@ -41,7 +41,7 @@ This document explains the system end-to-end so future developers can extend it 
 | `src/lib/analysis/engine.ts` | Multi-timeframe scoring: per-TF indicator votes → weighted score → verdict + confidence + ATR-based trade plan. Weights are constants at the top of the file. |
 | `src/lib/signal/daily.ts` | The product logic: lock one verdict per UTC day, expose history, score outcomes against real next-day closes, backfill from historical candles. |
 | `src/lib/auth/session.ts` | Nonces (single-use, expiring, exact-message storage), sessions (random secret + HMAC cookie + SHA-256 at rest). |
-| `src/lib/payments/onchain.ts` | On-chain payment verification via `eth_getTransactionReceipt` + ERC-20 Transfer log decoding. |
+| `src/lib/payments/onchain.ts` | On-chain payment verification via `eth_getTransactionReceipt` + ERC-20 Transfer log decoding. Amounts come from `subscriptionPackages` (`src/lib/config.ts`) resolved server-side from a `planId` — the client never names a price. |
 | `src/lib/rate-limit.ts` | In-memory sliding-window limiter used by every public route. |
 | `src/hooks/use-app-data.ts` | All TanStack Query hooks + the wallet sign-in mutation. |
 | `src/lib/i18n/` | `dict.ts` (fa/en), `context.tsx` (provider, cookie persistence, dir switching). |
@@ -50,9 +50,11 @@ This document explains the system end-to-end so future developers can extend it 
 
 1. **Never trust the client about money.** The frontend submits only `{ intentId, txHash }`.
    Amount, recipient, sender, token, chain and timing are re-derived from the blockchain.
-2. **Entitlements live server-side.** `/api/signal/today` checks session → access fee →
-   day unlock/subscription before serializing any signal content. The free tier receives
-   only neutral metadata (`access` state + date) — never the verdict.
+2. **Entitlements live server-side.** `/api/signal/today` checks session → active
+   subscription before serializing any signal content; the API answers with
+   `auth_required` | `subscription_required` | `granted`. Registration is free, but
+   the free tier receives only neutral metadata (`access` state + date) — never
+   the verdict.
 3. **No signal leaks.** The public track record masks any day whose outcome is still
    unknown (`LOCKED` rows) so today's paid verdict can't be inferred from history.
 4. **Replay-proof auth.** Nonces are single-use, expire in 10 min, and the exact signed
@@ -70,13 +72,30 @@ This document explains the system end-to-end so future developers can extend it 
 00:00 UTC ─ first request of the day
             └─ engine pulls fresh candles (15m/1h/4h/1d, only CLOSED candles)
             └─ composite score → verdict → persisted to DailySignal (immutable for the day)
-   …users pay 1 PENGU (or have a subscription) → /api/signal/today returns the locked row
+   …users with an active plan (day/week/month/year/lifetime) → /api/signal/today returns the locked row
 next day  ─ history scorer compares verdict direction vs real next-day close → WIN/LOSS/NEUTRAL
 ```
 
 Backfill: on the first-ever `/api/signal/history` call, the engine replays its scoring
 over the last ~21 days of real daily candles, so the public track record is genuine
 market data from day one (each historical row stores `invalidation: "historical"`).
+
+## Payments & crediting (v2 tariff)
+
+- **Free tier**: wallet registration + signature login cost nothing; signed-in users
+  get market data, track record, backtest and risk calculator. Signals stay locked.
+- **Plans** (`subscriptionPackages` in `config.ts`, env-tunable): day 10 / week 5 /
+  month 30 / year 100 / lifetime 1500 PENGU.
+- `POST /api/payments/intent` takes only `{ planId }` — the server resolves the amount,
+  treasury and chain, and stores a `PaymentIntent` (`type: 'SUBSCRIPTION'`, `days: null`
+  for lifetime). Lifetime owners get `already_lifetime` — nothing left to buy.
+- After on-chain verification, finite plans **stack**: credited days extend the current
+  `User.subscriptionUntil` instead of replacing it. `lifetime` stores the 2099-12-31
+  sentinel in `User.subscriptionUntil` and sets `User.subscriptionPlan = 'lifetime'`.
+- **No Session Keys** (owner decision, Round 16): mainnet session keys require a
+  security review + Session Key Policy Registry listing, so the only payment mechanism
+  is a plain ERC-20 transfer verified against block data. The intent/verify API pair is
+  the seam where a session-key flow could be introduced later.
 
 ## Adding a language
 

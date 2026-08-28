@@ -75,22 +75,59 @@ export const treasuryAddress: string = (
 /** PENGU token has 18 decimals (verified on-chain). */
 export const PENGU_DECIMALS = 18
 
-/** Pricing configuration (PENGU units). */
+/**
+ * Pricing configuration (PENGU units).
+ *
+ * Tariff model (owner decision — Round 16):
+ *  - Registration & wallet login are FREE; signals stay locked (free tier).
+ *  - Time-based plans unlock the daily signal; renewals stack days.
+ *  - NO session keys: plain ERC-20 transfers, verified on-chain.
+ */
 export const pricing = {
-  accessFee: Number(process.env.ACCESS_FEE_PENGU ?? 5),
-  dailySignal: Number(process.env.DAILY_SIGNAL_PRICE_PENGU ?? 1),
-  subscription7d: Number(process.env.SUBSCRIPTION_7D_PRICE_PENGU ?? 7),
+  subscription1d: Number(process.env.SUBSCRIPTION_1D_PRICE_PENGU ?? 10),
+  subscription7d: Number(process.env.SUBSCRIPTION_7D_PRICE_PENGU ?? 5),
   subscription30d: Number(process.env.SUBSCRIPTION_30D_PRICE_PENGU ?? 30),
+  subscription365d: Number(process.env.SUBSCRIPTION_365D_PRICE_PENGU ?? 100),
+  subscriptionLifetime: Number(process.env.SUBSCRIPTION_LIFETIME_PRICE_PENGU ?? 1500),
 } as const
 
-/** Subscription package definitions surfaced to the UI. */
-export const subscriptionPackages = [
-  { id: 'day', days: 1, label: 'day', price: pricing.dailySignal },
-  { id: 'week', days: 7, label: 'week', price: pricing.subscription7d },
-  { id: 'month', days: 30, label: 'month', price: pricing.subscription30d },
-] as const
+/** Plan ids accepted by the payment intent API. */
+export type SubscriptionPackageId = 'day' | 'week' | 'month' | 'year' | 'lifetime'
 
-export type SubscriptionPackageId = (typeof subscriptionPackages)[number]['id']
+export interface SubscriptionPackage {
+  id: SubscriptionPackageId
+  /** Days of access; null = lifetime */
+  days: number | null
+  label: string
+  /** Price in whole PENGU */
+  price: number
+  popular?: boolean
+}
+
+/** Subscription package definitions — the single source of truth for prices. */
+export const subscriptionPackages: readonly SubscriptionPackage[] = [
+  { id: 'day', days: 1, label: 'day', price: pricing.subscription1d },
+  { id: 'week', days: 7, label: 'week', price: pricing.subscription7d },
+  { id: 'month', days: 30, label: 'month', price: pricing.subscription30d, popular: true },
+  { id: 'year', days: 365, label: 'year', price: pricing.subscription365d },
+  { id: 'lifetime', days: null, label: 'lifetime', price: pricing.subscriptionLifetime },
+]
+
+/** Sentinel stored in `User.subscriptionUntil` for lifetime plans (2099-12-31). */
+export const LIFETIME_SENTINEL_MS = Date.parse('2099-12-31T00:00:00.000Z')
+
+/** True when a `subscriptionUntil` value represents a lifetime plan. */
+export function isLifetimeUntil(until: Date | string | null | undefined): boolean {
+  if (!until) return false
+  return new Date(until).getTime() >= LIFETIME_SENTINEL_MS
+}
+
+/** Map a payment intent's `days` back to its plan id (null → lifetime). */
+export function planIdForDays(days: number | null): SubscriptionPackageId {
+  if (days == null) return 'lifetime'
+  const pkg = subscriptionPackages.find((p) => p.days === days)
+  return pkg?.id ?? 'month'
+}
 
 /** Market data source configuration (GeckoTerminal — free, no key). */
 export const marketConfig = {

@@ -572,3 +572,52 @@ Stage Summary:
 - QA methodology hardened: always clear console before judging; verify screenshot scroll positions (smooth-scroll race found & fixed)
 - All QA green: EN+FA+mobile+lint+tsc+E2E+VLM
 - Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) optional roadmap: Telegram/email alerts, session keys; 4) observe: AGW loadProviderDetails fetch failure remains environment-specific (Preview Panel sandbox), gracefully degraded
+
+---
+Task ID: 16-9
+Agent: docs-update-agent
+Task: Update README + docs/* + .env.example for the v2 subscription tariff (Session Keys deferred, direct PENGU payments)
+
+Work Log:
+- Read worklog Rounds 12–15 + current code to anchor docs to reality: src/lib/config.ts (5 SUBSCRIPTION_*_PRICE_PENGU vars, subscriptionPackages, LIFETIME_SENTINEL_MS), prisma/schema.prisma (User.subscriptionPlan column), /api/payments/intent (planId-based, already_lifetime rejection), /api/signal/today (auth_required | subscription_required | granted), scripts/e2e-auth.ts (22 pass() checks), qa-subscription-fixture.ts (mode arg), qa-freesession.ts
+- README.md: intro rewritten (free registration + time-based plans); quick-start ladder now "connect → sign → pick a plan → signal unlocked"; new "Payments & access" section with the tariff table (Free tier + day 10 / week 5 / month 30 / year 100 / lifetime 1500 PENGU), day-stacking + 2099-12-31 sentinel + already_lifetime, and a one-sentence Session Keys stance (deliberately not used — mainnet audit policy; plain one-shot ERC-20 transfers; may be revisited). On-chain verification table kept intact
+- README.md config table: removed ACCESS_FEE_PENGU + DAILY_SIGNAL_PRICE_PENGU rows; added the 5 SUBSCRIPTION_*_PRICE_PENGU rows with defaults. Testing section: 18→22 checks, added the two UI fixtures (`bun scripts/qa-subscription-fixture.ts [expiring|active|lifetime]`, `bun scripts/qa-freesession.ts`)
+- docs/ARCHITECTURE.md: security-model item #2 now describes the session → active subscription ladder with the 3 access values; payments module-map row notes planId → server-resolved pricing (client never names an amount); lifecycle line updated; new "Payments & crediting (v2 tariff)" section (free tier, 5 plans, intent shape, stacking, lifetime sentinel + User.subscriptionPlan='lifetime', no-session-keys decision + intent/verify seam)
+- docs/ABSTRACT_PORTAL.md: §2 funding row + §5 mainnet acceptance test rewritten for the plan flow (was 5 PENGU access fee + 1 PENGU day-unlock steps); §7 session-keys table row + rationale paragraph reframed as the OWNER'S EXPLICIT DECISION (Round 16): deliberately deferred due to mainnet security review + Session Key Policy Registry listing; today's model is direct one-shot ERC-20 transfers with on-chain verification; the intent/verify API pair is the future migration seam
+- docs/MAINTENANCE.md: "Change pricing" runbook now lists the 5 SUBSCRIPTION_* vars + notes a price change only affects NEW intents (credited days and lifetime persist); e2e count 18→22 ✅ (2 places); release-checklist browser pass updated ("connect → sign → buy a plan"). Treasury rotation section untouched
+- docs/DEPLOYMENT.md: Cloudflare env block swapped to the 5 new pricing vars (old ACCESS_FEE/DAILY_SIGNAL rows + stale 7d=7 removed); post-deploy step 4 now uses a plan intent (10 PENGU day example) instead of an ACCESS intent
+- docs/TESTNET.md: ladder line updated to connect → sign (free) → buy any plan with test tokens
+- Created .env.example (referenced by README but missing): all current vars with short comments, the 5 pricing vars annotated with plan durations, SESSION_SECRET = placeholder `change-me-min-32-chars-long-random-hex` (real secret NOT copied); DATABASE_URL documented as absolute path with a note on Prisma's schema-relative resolution
+- VERIFICATION: rg sweep over README.md + docs/ + .env.example for ACCESS_FEE, DAILY_SIGNAL_PRICE, access_fee_required, day_unlock_required, one-time, access fee, day unlock, day pass, "5 PENGU", "1 PENGU", 18 ✅/18-check, ACCESS intent, pay ladder, prepaid → 0 matches. Cross-checked src/, scripts/, prisma/ for the removed pricing vars → also clean
+- Found but NOT fixed (outside docs scope): `.gitignore` line 57 (`.env*`) also ignores the NEW .env.example (verified with `git check-ignore -v`) — orchestrator should add a `!.env.example` exception or `git add -f .env.example`, otherwise the file stays untracked and the README reference breaks for fresh clones. No git commit made (Round 16 changes incl. docs are uncommitted in the working tree for the orchestrator to commit)
+
+Stage Summary:
+- 7 files: README.md, docs/ARCHITECTURE.md, docs/ABSTRACT_PORTAL.md, docs/MAINTENANCE.md, docs/DEPLOYMENT.md, docs/TESTNET.md (edited) + .env.example (created). No changes to src/, prisma/, scripts/, .env — documentation only
+- Key decisions: tariff documented as Free tier + 5 plans (10/5/30/100/1500 PENGU) with the simplified 3-state ladder (auth_required | subscription_required | granted); Session Keys consistently framed as the owner's deliberate Round 16 deferral (mainnet audit policy) with the intent/verify pair named as the future migration seam; price-change semantics (new intents only) recorded in the maintenance runbook; e2e check count corrected to 22 everywhere it appeared
+- Stale-reference sweep of all edited files: clean. Open item for orchestrator: .gitignore excludes .env.example (needs a `!.env.example` exception before commit)
+
+---
+Task ID: 16-0 … 16-8, 16-10, 16-11 (docs: 16-9 logged separately)
+Agent: orchestrator (main)
+Task: Owner request (Persian) — remove Session-Keys-based payment concerns, move to a direct-payment tariff: free registration/login (no signals), 1d=10 / 7d=5 / 30d=30 / 1y=100 / lifetime=1500 PENGU, keep content security server-side, keep Session Keys as a future option, update the whole system + docs.
+
+Work Log:
+- Recon (Explore agent): discovered wallet-auth + on-chain-verified PENGU payments + entitlement ladder already existed (Rounds 1–15, HEAD 3d4bee4); Session Keys were never implemented in code (docs only, rejected in Round 6). Real work = tariff rework, NOT a from-scratch build.
+- lib/config.ts: new pricing (SUBSCRIPTION_1D/7D/30D/365D/LIFETIME_PRICE_PENGU, defaults 10/5/30/100/1500), typed SubscriptionPackage interface, popular flag on month, LIFETIME_SENTINEL_MS (2099-12-31), isLifetimeUntil() + planIdForDays() helpers.
+- .env: swapped pricing block to the 5 new vars (removed ACCESS_FEE_PENGU, DAILY_SIGNAL_PRICE_PENGU).
+- prisma/schema.prisma: +User.subscriptionPlan (nullable, additive), LEGACY comments on accessGranted/SignalUnlock; bun run db:push OK.
+- /api/payments/intent: planId-based ({day|week|month|year|lifetime}), amount resolved server-side, already_lifetime guard. /api/payments/verify: lifetime crediting (sentinel + plan), finite stacking keeps planIdForDays; legacy ACCESS/SIGNAL_DAY branches retained for old PENDING intents.
+- /api/signal/today: ladder simplified to auth_required → subscription_required → granted (access-fee & day-unlock gates removed; no signal payload without active sub).
+- /api/auth/me: returns hasSubscription, subscriptionPlan, isLifetime, daysLeft (null for lifetime).
+- Frontend: signal-card state machine (connect → signing → subscribe → full) with new PlanGrid (5 plans from /api/config); SubscriptionStatus lifetime strip (crown + ∞ badge); PaymentDialog shows Plan row (N days / 1 year / Lifetime); pricing section rebuilt (free-tier strip + 5 plan cards, per-day rates, popular glow); wallet dropdown subscription row (days-left or lifetime + upsell link).
+- i18n dict (en+fa): ~45 new/updated keys (pricing.*, sub.*, pay.plan*, signal.subscriptionRequired*, auth.subDaysLeft/noSubscription/choosePlan), FAQ q7 "Do you charge automatically? (Session keys)", removed retired keys; hero/ctaBanner/holderPerks copy de-old-tariff'd.
+- Scripts: e2e-auth.ts → 22 checks (new ladder, exact amounts 10/30/1500 PENGU via string-wei helper, invalid-plan rejection, no-leak assertions); qa-subscription-fixture.ts modes [expiring|active|lifetime]; NEW qa-freesession.ts (authed no-sub session).
+- Session-key references scrubbed from source comments (signal-card.tsx) — docs handled by 16-9 subagent.
+
+Stage Summary:
+- QA: e2e 22/22 ✅; lint clean; tsc clean (src/scripts); agent-browser EN+FA+mobile(390px, no overflow)+payment-dialog+subscribe-state+lifetime-fixture all verified; VLM: pricing EN 9.5, mobile 8 (fixed → 1-col mobile + brighter CTAs), lifetime FA 9.
+- Fixed post-VLM: mobile pricing 2-col→1-col stacking, feature text xs on mobile, non-popular CTA border-primary/25, free-tier grouping.
+- IMPORTANT PRICING NOTE (flag to owner): the 7-day plan (5 PENGU) is CHEAPER than the 1-day pass (10 PENGU) exactly as specified in the request — implemented verbatim, env-tunable via SUBSCRIPTION_7D_PRICE_PENGU; per-day rate line in the UI makes it visible. If it was a typo (e.g. 50), change one env var.
+- Legacy data: old access-fee payers are NOT auto-migrated to the new tariff (sandbox-only data); accessGranted column kept for rollback safety.
+- .gitignore: +!.env.example exception (was swallowed by .env* rule).
+- Unresolved/next: funded-wallet live payment smoke (needs owner treasury+PENGU), Cloudflare deployment (docs ready), Telegram/email alerts, optional Session Keys reintroduction via the intent/verify seam.

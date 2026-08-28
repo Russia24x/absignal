@@ -39,8 +39,8 @@ In the UI:
 
 - The header badge shows **Abstract Testnet**.
 - Payment dialogs expect chain `11124` (wrong-network switching targets testnet).
-- The whole ladder works: connect → sign → 5 test-PENGU access → 1 test-PENGU
-  day unlock — with on-chain verification running against the testnet RPC.
+- The whole ladder works: connect → sign (free) → buy any plan with test tokens —
+  with on-chain verification running against the testnet RPC.
 
 ## 4. What differs from mainnet
 

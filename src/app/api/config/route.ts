@@ -5,7 +5,6 @@ import {
   networkMode,
   penguAddress,
   treasuryAddress,
-  pricing,
   subscriptionPackages,
   marketConfig,
   validateConfig,
@@ -24,7 +23,6 @@ export async function GET(req: Request) {
     chain,
     penguAddress,
     treasuryAddress,
-    pricing,
     packages: subscriptionPackages,
     dataSource: {
       provider: 'GeckoTerminal',

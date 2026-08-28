@@ -24,7 +24,7 @@ and for managing the project's presence in the Abstract ecosystem.
 | Wallet | Needs | Why |
 |---|---|---|
 | Treasury (`0x60Df…8818`) | nothing to receive PENGU | receiving is free |
-| Your personal wallet (for testing) | a few PENGU + a little ETH on Abstract | to test the 5 PENGU access fee and 1 PENGU unlocks end-to-end |
+| Your personal wallet (for testing) | a few PENGU + a little ETH on Abstract | to test plan purchases (e.g. the 10 PENGU day plan) end-to-end |
 | Users | PENGU + ETH for gas | they transfer PENGU and pay gas |
 
 To move PENGU from another chain onto Abstract, use the official bridge
@@ -60,13 +60,12 @@ manually:
 
 ```bash
 # with the app running and your funded wallet connected in the browser:
-1. Connect wallet            → signature prompt appears → session starts
-2. Signal card               → shows "Platform access" step (5 PENGU)
-3. Pay access                → wallet asks to transfer 5 PENGU to the treasury
+1. Connect wallet            → signature prompt appears → session starts (free)
+2. Signal card               → shows the plan grid (day / week / month / year / lifetime)
+3. Pick a plan               → wallet asks to transfer the plan price to the treasury
 4. Confirmation              → dialog advances to "verified on Abstract"
-5. Signal card               → shows "Unlock today" step (1 PENGU)
-6. Pay day unlock            → full signal renders (verdict, plan, indicators)
-7. Explorer                  → both transfers visible on the treasury address:
+5. Signal card               → full signal renders (verdict, plan, indicators)
+6. Explorer                  → the transfer is visible on the treasury address:
                                https://explorer.abs.xyz/address/0x60Df4E186364c3a49A550Aee29Da1d5fe3658818
 ```
 
@@ -89,17 +88,19 @@ How this codebase maps to the official Abstract documentation:
 | [AGW — Signature Validation / ERC-1271](https://docs.abs.xyz/how-abstract-works/native-account-abstraction/signature-validation) | Auth verifies smart-account signatures via `publicClient.verifyMessage` (ERC-1271 + ERC-6492 counterfactual support) — never raw ECDSA checks | ✅ aligned |
 | [Abstract JSON-RPC API](https://docs.abs.xyz/api-reference/overview/abstract-json-rpc-api) | Server uses only standard `eth_*` methods (`eth_getTransactionReceipt`, `eth_getBlockByNumber`, `eth_call`) against the public RPC — no `zks_`/`debug_` dependencies | ✅ aligned |
 | [build.abs.xyz — AGW Reusables](https://build.abs.xyz) | shadcn/ui-compatible AGW component registry (Connect Wallet, Sign-in with Ethereum, Session Keys, Onboarding). Our custom components already cover connect + sign-in with the same AGW SDK underneath — no duplication needed | ✅ noted |
-| [Session keys](https://docs.abs.xyz/abstract-global-wallet/session-keys/overview) | **Mainnet session keys require a security review + Session Key Policy Registry listing.** We deliberately do NOT use them: "auto-renew" is implemented as prepaid packages + one-click stacking renewal (days extend from current expiry) — user-signed, no background charging, no review dependency | ✅ pragmatic choice |
+| [Session keys](https://docs.abs.xyz/abstract-global-wallet/session-keys/overview) | **Owner's explicit decision (Round 16): deliberately deferred.** Mainnet session keys require a security review + Session Key Policy Registry listing; the current model is direct one-shot ERC-20 transfers with on-chain verification — no session-key code ships today. The intent/verify API pair is the seam for a future migration | ✅ deliberate deferral |
 | [AI-agents resources](https://docs.abs.xyz/ai-agents/resources/overview) | `docs.abs.xyz/llms.txt` is the canonical doc index; any page is fetchable as Markdown by appending `.md` | ✅ used for this audit |
 
-**Why no session keys today:** session keys would let the app charge
-1 PENGU/day while the user is offline, but on mainnet they mandate an app
-security review and registry whitelisting (per the official docs). That is a
-heavy process with real custodial risk for a 1 PENGU/day product. The stacking
-renewal UX delivers the same outcome — uninterrupted daily signals — with the
-user signing exactly one transaction per renewal period. If the product later
-justifies it, the session-key path (createSession/toSessionClient from
-`@abstract-foundation/agw-client`) remains open and documented.
+**Why no session keys (owner's explicit decision, Round 16):** on mainnet,
+session keys mandate an app security review and Session Key Policy Registry
+listing (per the official docs) — a process this product deliberately avoids
+for now. The current payment model is direct one-shot ERC-20 transfers with
+on-chain verification: the user signs exactly one plain transfer per purchase,
+no background charging, no custodial risk. Re-introduction remains possible:
+the payment flow is already abstracted behind the intent/verify API pair, so a
+session-key path (createSession/toSessionClient from
+`@abstract-foundation/agw-client`) could be slotted in later without touching
+the product logic.
 
 ## 8. Abstract Profile integration (build.abs.xyz AGW Reusable — 2026-08, round 7)
 

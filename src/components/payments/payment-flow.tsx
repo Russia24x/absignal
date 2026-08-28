@@ -45,20 +45,18 @@ import { getDisplayName } from '@/lib/abstract/get-user-profile'
 import { appChain, penguAddress, treasuryAddress } from '@/lib/chains'
 import { cn } from '@/lib/utils'
 
-export type PayButtonType = 'ACCESS' | 'SIGNAL_DAY' | 'SUBSCRIPTION'
+export type PayPlanId = 'day' | 'week' | 'month' | 'year' | 'lifetime'
 
 /* ------------------------------- The button ------------------------------- */
 
 export function PayButton({
-  type,
-  days,
+  planId,
   children,
   className,
   variant = 'default',
   size = 'lg',
 }: {
-  type: PayButtonType
-  days?: number
+  planId: PayPlanId
   children: React.ReactNode
   className?: string
   variant?: 'default' | 'secondary' | 'outline'
@@ -69,12 +67,12 @@ export function PayButton({
 
   const start = async () => {
     try {
-      const result = await createIntent.mutateAsync({ type, days })
+      const result = await createIntent.mutateAsync({ planId })
       setIntent(result)
     } catch (err) {
-      // Silently ignore already-granted; surface others via the mutation error state
+      // Silently ignore already-lifetime; surface others via the mutation error state
       const message = (err as Error).message
-      if (message === 'already_granted') return
+      if (message === 'already_lifetime') return
       throw err
     }
   }
@@ -111,7 +109,7 @@ export function PaymentDialog({
   intent: PaymentIntentResponse
   onClose: () => void
 }) {
-  const { t, lang } = useI18n()
+  const { t, tf, fmt, lang } = useI18n()
   // Treasury identity from the Abstract Portal (verified receiver — the
   // profile of the wallet that receives PENGU payments).
   const { data: treasuryProfile } = useAbstractProfileByAddress(treasuryAddress)
@@ -256,6 +254,16 @@ export function PaymentDialog({
 
         {/* Details */}
         <div className="rounded-xl bg-secondary/50 border border-border/60 p-3.5 space-y-2.5 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">{t.pay.plan}</span>
+            <span className="font-semibold">
+              {intent.days == null
+                ? t.pay.planLifetime
+                : intent.days === 365
+                  ? t.pay.planYear
+                  : tf(t.pay.planDays, { days: fmt(intent.days) })}
+            </span>
+          </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">{t.pay.amount}</span>
             <span className="font-bold text-primary text-base">

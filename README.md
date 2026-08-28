@@ -6,9 +6,10 @@ PenguSignal reads the real PENGU market every day (live DEX data on Abstract), r
 multi-timeframe technical-analysis engine (RSI, MACD, EMA, Bollinger, Stochastic, ADX, OBV, ATR),
 and locks a clear daily verdict — with entry zone, stop-loss and targets.
 
-Access works entirely on-chain: connect an Abstract wallet, pay the one-time platform fee
-(5 PENGU), then unlock each day's signal for 1 PENGU or subscribe. Payments are plain PENGU
-transfers to a fixed treasury wallet, verified directly against Abstract block data.
+Registration is **free**: connect an Abstract wallet, sign once, and browse the market
+data, track record, backtest and risk calculator. Daily signals unlock with a time-based
+PENGU plan — from a single day to lifetime. Payments are plain PENGU transfers to a fixed
+treasury wallet, verified directly against Abstract block data.
 
 - 🇮🇷 Persian (RTL) & English (LTR) UI — switch from the header
 - 📊 Live terminal: price, volume, liquidity, candlestick chart (15m/1h/4h/1d)
@@ -49,7 +50,7 @@ openssl rand -hex 32   # → SESSION_SECRET
 Open `http://localhost:3000`, connect with the **Abstract Global Wallet (AGW)** —
 the official Abstract smart-account wallet (email, social or external wallet
 login; every method yields the same AGW account) — and walk the ladder:
-connect → sign → pay access → unlock signal. Signature authentication supports
+connect → sign → pick a plan → signal unlocked. Signature authentication supports
 both EOAs and smart accounts (ERC-1271 / ERC-6492).
 
 ## How it works
@@ -71,7 +72,31 @@ both EOAs and smart accounts (ERC-1271 / ERC-6492).
    Past days are later scored against the real next-day close — the public
    **track record** is therefore genuinely data-driven.
 
-### Payments (`src/lib/payments/onchain.ts`)
+### Payments & access (`src/lib/payments/onchain.ts`)
+
+Registration and login (a wallet signature) are **free** — the free tier covers the market
+data, track record, backtest and risk calculator. Daily signals stay locked until an
+active plan exists:
+
+| Plan | Access | Default price (PENGU) |
+|---|---|---|
+| Free | registration + login; market data, track record, backtest, risk calculator | 0 |
+| `day` | 1 day | 10 |
+| `week` | 7 days | 5 |
+| `month` | 30 days | 30 |
+| `year` | 365 days | 100 |
+| `lifetime` | never expires | 1500 |
+
+All prices are env-tunable (see [Configuration](#configuration)). The entitlement ladder is
+server-enforced and minimal — valid session → active subscription → granted — surfaced by
+the API as `auth_required` | `subscription_required` | `granted`. Finite plans stack (a new
+purchase extends the current expiry); `lifetime` stores a 2099-12-31 sentinel that never
+expires, and lifetime owners cannot purchase again (`already_lifetime`).
+
+Session Keys are deliberately **not** used — Abstract mainnet requires a security review
+and Session Key Policy Registry listing for them, so payments are plain one-shot ERC-20
+transfers with on-chain verification (may be revisited later; the intent/verify API pair
+is the abstraction seam).
 
 The browser only submits a tx hash. The backend then verifies **on-chain via the Abstract
 RPC**:
@@ -103,9 +128,11 @@ Everything is environment-driven — **nothing is hardcoded**. See `.env.example
 | `NEXT_PUBLIC_PENGU_MAINNET` | `0x9ebe…cba62` | PENGU ERC-20 on Abstract mainnet |
 | `NEXT_PUBLIC_PENGU_TESTNET` | — | any test ERC-20 for testnet mode |
 | `NEXT_PUBLIC_TREASURY_ADDRESS` | `0x60Df…8818` | where all PENGU payments land |
-| `ACCESS_FEE_PENGU` | `5` | one-time platform access fee |
-| `DAILY_SIGNAL_PRICE_PENGU` | `1` | per-day signal unlock |
-| `SUBSCRIPTION_7D_PRICE_PENGU` / `SUBSCRIPTION_30D_PRICE_PENGU` | `7` / `30` | prepaid packages |
+| `SUBSCRIPTION_1D_PRICE_PENGU` | `10` | day plan (1 day) |
+| `SUBSCRIPTION_7D_PRICE_PENGU` | `5` | week plan (7 days) |
+| `SUBSCRIPTION_30D_PRICE_PENGU` | `30` | month plan (30 days, most popular) |
+| `SUBSCRIPTION_365D_PRICE_PENGU` | `100` | year plan (365 days) |
+| `SUBSCRIPTION_LIFETIME_PRICE_PENGU` | `1500` | lifetime plan (never expires) |
 | `GECKOTERMINAL_NETWORK` / `GECKOTERMINAL_POOL` | `abstract` / PENGU-WETH pool | market data source |
 | `SESSION_SECRET` | — | **required**, ≥ 32 chars (`openssl rand -hex 32`) |
 
@@ -119,14 +146,23 @@ token address — see [docs/TESTNET.md](docs/TESTNET.md).
 ## Testing
 
 ```bash
-bun scripts/e2e-auth.ts   # 18-check backend security suite (auth, paywall, payments)
+bun scripts/e2e-auth.ts   # 22-check backend security suite (auth, paywall, payments)
 bun run lint              # ESLint
 bunx tsc --noEmit         # type check
 ```
 
 The E2E suite generates a throwaway wallet and exercises the real flow end-to-end:
 nonce issuance, signature verification, replay/forgery rejection, session lifecycle,
-the paywall ladder, payment intents, and on-chain rejection of fake transactions.
+the entitlement ladder, plan-based payment intents (exact amounts), and on-chain
+rejection of fake transactions.
+
+UI fixtures (dev only — create a session via the real auth flow and print the cookie
+for browser injection):
+
+```bash
+bun scripts/qa-subscription-fixture.ts [expiring|active|lifetime]  # subscribed session
+bun scripts/qa-freesession.ts                                      # logged in, no subscription
+```
 
 ## Deployment
 

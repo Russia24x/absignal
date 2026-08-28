@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSessionUser, cookieFromRequest } from '@/lib/auth/session'
 import { verifyPaymentTx } from '@/lib/payments/onchain'
+import { isLifetimeUntil, planIdForDays, LIFETIME_SENTINEL_MS } from '@/lib/config'
 import { utcDate } from '@/lib/signal/daily'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
 
@@ -68,35 +69,58 @@ export async function POST(req: Request) {
   }
 
   // --- Credit the entitlement (idempotent via intent status) ---
-  const today = utcDate()
 
   if (intent.type === 'ACCESS') {
+    // Legacy pre-v2 intents only — the current tariff never creates these.
     await db.user.update({
       where: { id: user.id },
       data: { accessGranted: true, accessGrantedAt: new Date() },
     })
   } else if (intent.type === 'SIGNAL_DAY') {
+    // Legacy pre-v2 intents only.
     await db.signalUnlock.upsert({
-      where: { userId_signalDate: { userId: user.id, signalDate: today } },
-      create: { userId: user.id, signalDate: today, intentId: intent.id },
+      where: { userId_signalDate: { userId: user.id, signalDate: utcDate() } },
+      create: { userId: user.id, signalDate: utcDate(), intentId: intent.id },
       update: {},
     })
   } else if (intent.type === 'SUBSCRIPTION') {
-    const days = intent.days ?? 1
-    const current = await db.user.findUnique({ where: { id: user.id }, select: { subscriptionUntil: true } })
-    const base =
-      current?.subscriptionUntil && current.subscriptionUntil.getTime() > Date.now()
-        ? current.subscriptionUntil.getTime()
-        : Date.now()
-    const newUntil = new Date(base + days * 24 * 60 * 60 * 1000)
-    await db.user.update({
+    const current = await db.user.findUnique({
       where: { id: user.id },
-      data: {
-        subscriptionUntil: newUntil,
-        accessGranted: true, // subscribers always keep platform access
-        accessGrantedAt: current?.subscriptionUntil ? undefined : new Date(),
-      },
+      select: { subscriptionUntil: true },
     })
+    const currentUntil = current?.subscriptionUntil ?? null
+    const currentlyLifetime = isLifetimeUntil(currentUntil)
+    const buyingLifetime = intent.days == null
+
+    if (buyingLifetime || currentlyLifetime) {
+      // Lifetime always wins — no expiry, no stacking math.
+      await db.user.update({
+        where: { id: user.id },
+        data: {
+          subscriptionUntil: new Date(LIFETIME_SENTINEL_MS),
+          subscriptionPlan: 'lifetime',
+          accessGranted: true,
+          accessGrantedAt: currentUntil ? undefined : new Date(),
+        },
+      })
+    } else {
+      // Finite plan: renewal days stack on top of remaining time.
+      const days = intent.days ?? 1
+      const base =
+        currentUntil && currentUntil.getTime() > Date.now()
+          ? currentUntil.getTime()
+          : Date.now()
+      const newUntil = new Date(base + days * 24 * 60 * 60 * 1000)
+      await db.user.update({
+        where: { id: user.id },
+        data: {
+          subscriptionUntil: newUntil,
+          subscriptionPlan: planIdForDays(days),
+          accessGranted: true,
+          accessGrantedAt: currentUntil ? undefined : new Date(),
+        },
+      })
+    }
   }
 
   await db.paymentIntent.update({
@@ -107,6 +131,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     status: 'credited',
     type: intent.type,
+    planId: planIdForDays(intent.days),
     days: intent.days,
     txHash,
     blockTimestamp: result.blockTimestamp,

@@ -75,10 +75,11 @@ NEXT_PUBLIC_APP_NETWORK=mainnet
 NEXT_PUBLIC_RPC_MAINNET=https://api.mainnet.abs.xyz
 NEXT_PUBLIC_PENGU_MAINNET=0x9ebe3a824ca958e4b3da772d2065518f009cba62
 NEXT_PUBLIC_TREASURY_ADDRESS=0x60Df4E186364c3a49A550Aee29Da1d5fe3658818
-ACCESS_FEE_PENGU=5
-DAILY_SIGNAL_PRICE_PENGU=1
-SUBSCRIPTION_7D_PRICE_PENGU=7
+SUBSCRIPTION_1D_PRICE_PENGU=10
+SUBSCRIPTION_7D_PRICE_PENGU=5
 SUBSCRIPTION_30D_PRICE_PENGU=30
+SUBSCRIPTION_365D_PRICE_PENGU=100
+SUBSCRIPTION_LIFETIME_PRICE_PENGU=1500
 GECKOTERMINAL_NETWORK=abstract
 GECKOTERMINAL_POOL=0xda7d037fda848177141e037f9d0c67cae7b53262
 SESSION_SECRET=<openssl rand -hex 32>   # use `wrangler secret put SESSION_SECRET` instead
@@ -126,6 +127,7 @@ language flash for Persian users.
 1. `GET https://<your-domain>/api/config` → `configOk: true` and the right addresses.
 2. `GET /api/signal/history` → rows appear (first call backfills from real candles).
 3. Connect a wallet on the deployed site → signature prompt → session cookie set.
-4. Create an ACCESS intent → send 5 PENGU from a funded wallet → dialog reaches
-   “verified” and the signal card switches to the day-unlock state.
+4. Create a plan intent (e.g. `day`) → send the plan price (10 PENGU by default)
+   from a funded wallet → dialog reaches “verified” and the signal card renders
+   the full signal.
 5. Confirm the payment shows at `https://explorer.abs.xyz/address/<treasury>`.

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser, cookieFromRequest } from '@/lib/auth/session'
 import { utcDate } from '@/lib/signal/daily'
-import { db } from '@/lib/db'
+import { isLifetimeUntil } from '@/lib/config'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
@@ -14,23 +14,25 @@ export async function GET(req: Request) {
   const user = await getSessionUser(cookieFromRequest(req))
   if (!user) return NextResponse.json({ user: null })
 
-  const today = utcDate()
+  const until = user.subscriptionUntil
+  const isLifetime = isLifetimeUntil(until)
   const hasSubscription =
-    user.subscriptionUntil != null && user.subscriptionUntil.getTime() >= Date.now()
-  const unlockedToday = hasSubscription
-    ? true
-    : (await db.signalUnlock.findUnique({
-        where: { userId_signalDate: { userId: user.id, signalDate: today } },
-      })) != null
+    !!until && (isLifetime || until.getTime() >= Date.now())
+  const daysLeft = isLifetime
+    ? null
+    : hasSubscription
+      ? Math.max(0, Math.ceil((until!.getTime() - Date.now()) / 86_400_000))
+      : 0
 
   return NextResponse.json({
     user: {
       address: user.address,
-      accessGranted: user.accessGranted,
-      subscriptionUntil: user.subscriptionUntil,
       hasSubscription,
-      unlockedToday,
-      today,
+      subscriptionUntil: until,
+      subscriptionPlan: isLifetime ? 'lifetime' : user.subscriptionPlan,
+      isLifetime,
+      daysLeft,
+      today: utcDate(),
     },
   })
 }

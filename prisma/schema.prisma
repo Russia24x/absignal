@@ -15,11 +15,15 @@ model User {
   id               String    @id @default(cuid())
   /// Lowercase EVM address (0x…)
   address          String    @unique
-  /// One-time platform access (5 PENGU by default)
+  /// LEGACY (pre-v2 tariff): one-time access fee — no longer gating anything.
+  /// Kept for rollback safety; new users simply default to true on first purchase.
   accessGranted    Boolean   @default(false)
   accessGrantedAt  DateTime?
-  /// Active subscription end (inclusive); null = no subscription
+  /// Active subscription end (inclusive); null = never subscribed.
+  /// Lifetime plans store the 2099-12-31 sentinel (see lib/config.ts).
   subscriptionUntil DateTime?
+  /// Last credited plan id: day | week | month | year | lifetime
+  subscriptionPlan  String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -62,9 +66,9 @@ model Session {
 model PaymentIntent {
   id              String    @id @default(cuid())
   userId          String
-  /// ACCESS | SIGNAL_DAY | SUBSCRIPTION
+  /// Always SUBSCRIPTION in the v2 tariff; legacy rows may hold ACCESS | SIGNAL_DAY
   type            String
-  /// For SUBSCRIPTION: number of days purchased
+  /// Days purchased (null = lifetime plan)
   days            Int?
   /// Expected amount in PENGU wei (string — SQLite-safe)
   amountWei       String
@@ -103,7 +107,9 @@ model DailySignal {
   @@index([date])
 }
 
-/// Per-user per-day unlocks bought with 1 PENGU.
+/// LEGACY (pre-v2 tariff): per-user per-day unlocks bought with 1 PENGU.
+/// Kept as an audit trail of old day-passes; the new tariff is purely
+/// time-based (see lib/config.ts subscriptionPackages).
 model SignalUnlock {
   id         String   @id @default(cuid())
   userId     String

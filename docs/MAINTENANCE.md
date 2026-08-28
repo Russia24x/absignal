@@ -21,7 +21,7 @@ Everything an operator needs to run, monitor, and extend PenguSignal.
 bun scripts/e2e-auth.ts
 ```
 
-Run after any change to auth, payments, or the signal paywall. It must show 18 ✅.
+Run after any change to auth, payments, or the signal paywall. It must show 22 ✅.
 
 ### Prune stale rows (optional, safe anytime)
 
@@ -33,9 +33,12 @@ DELETE FROM Session        WHERE expiresAt  < datetime('now', '-1 day');
 
 ### Change pricing
 
-Only env vars — `ACCESS_FEE_PENGU`, `DAILY_SIGNAL_PRICE_PENGU`,
-`SUBSCRIPTION_7D_PRICE_PENGU`, `SUBSCRIPTION_30D_PRICE_PENGU`. The UI reads
-them from `/api/config`; restart after changing.
+Only env vars — `SUBSCRIPTION_1D_PRICE_PENGU`, `SUBSCRIPTION_7D_PRICE_PENGU`,
+`SUBSCRIPTION_30D_PRICE_PENGU`, `SUBSCRIPTION_365D_PRICE_PENGU`,
+`SUBSCRIPTION_LIFETIME_PRICE_PENGU`. The UI reads them from `/api/config`;
+restart after changing. A price change only affects **new** intents — already
+credited subscriptions keep their remaining days, and lifetime holders keep
+lifetime.
 
 ### Rotate the treasury
 
@@ -81,6 +84,6 @@ sqlite3 db/custom.db "SELECT date, verdict, score, confidence FROM DailySignal O
 
 1. `bunx tsc --noEmit` → clean
 2. `bun run lint` → clean
-3. `bun scripts/e2e-auth.ts` → 18 ✅
-4. Manual browser pass: connect → pay ladder → signal renders → language toggle → mobile width
+3. `bun scripts/e2e-auth.ts` → 22 ✅
+4. Manual browser pass: connect → sign → buy a plan → signal renders → language toggle → mobile width
 5. `GET /api/config` on the deployed host → `configOk: true`

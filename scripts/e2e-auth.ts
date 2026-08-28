@@ -8,6 +8,9 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 
 const BASE = 'http://127.0.0.1:3000'
 
+/** Whole PENGU → wei (18 decimals) as BigInt — no ES2020 literal needed. */
+const pengu = (units: string) => BigInt(units + '0'.repeat(18))
+
 function pass(name: string, condition: boolean, detail = '') {
   console.log(`${condition ? '✅' : '❌'} ${name}${detail ? ` — ${detail}` : ''}`)
   if (!condition) process.exitCode = 1
@@ -74,35 +77,63 @@ async function main() {
   const meRes = await fetch(`${BASE}/api/auth/me`, { headers: { cookie } })
   const meData = await meRes.json()
   pass('session identifies user', meData.user?.address === account.address.toLowerCase())
-  pass('access not yet granted', meData.user?.accessGranted === false)
+  pass('no subscription yet (free tier)', meData.user?.hasSubscription === false && meData.user?.subscriptionPlan === null)
 
-  /* --- 7. Signal paywall ladder --- */
+  /* --- 7. Signal paywall ladder (v2: free login → subscription gate) --- */
   const signalRes = await fetch(`${BASE}/api/signal/today`, { headers: { cookie } })
   const signalData = await signalRes.json()
-  pass('signal gated behind access fee', signalData.access === 'access_fee_required')
+  pass('signal gated behind subscription', signalData.access === 'subscription_required')
+  pass('no signal payload leak', signalData.signal === undefined)
 
-  /* --- 8. Payment intent --- */
+  /* --- 8. Payment intents (server-side pricing, planId only) --- */
   const intentRes = await fetch(`${BASE}/api/payments/intent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', cookie },
-    body: JSON.stringify({ type: 'ACCESS' }),
+    body: JSON.stringify({ planId: 'day' }),
   })
   const intentData = await intentRes.json()
-  const expectedWei = 5n * 10n ** 18n
   pass(
-    'intent created with exact amount',
-    intentRes.status === 200 && BigInt(intentData.amountWei) === expectedWei
+    'day-pass intent with exact amount (10 PENGU)',
+    intentRes.status === 200 && BigInt(intentData.amountWei) === pengu('10') && intentData.planId === 'day'
+  )
+  const monthIntent = await fetch(`${BASE}/api/payments/intent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', cookie },
+    body: JSON.stringify({ planId: 'month' }),
+  })
+  const monthData = await monthIntent.json()
+  pass(
+    'month intent with exact amount (30 PENGU)',
+    monthIntent.status === 200 && BigInt(monthData.amountWei) === pengu('30')
+  )
+  const lifetimeIntent = await fetch(`${BASE}/api/payments/intent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', cookie },
+    body: JSON.stringify({ planId: 'lifetime' }),
+  })
+  const lifetimeData = await lifetimeIntent.json()
+  pass(
+    'lifetime intent with exact amount (1500 PENGU)',
+    lifetimeIntent.status === 200 &&
+      BigInt(lifetimeData.amountWei) === pengu('1500') &&
+      lifetimeData.days === null
   )
   pass(
     'intent targets treasury',
     intentData.treasuryAddress?.toLowerCase() === '0x60df4e186364c3a49a550aee29da1d5fe3658818'
   )
+  const badPlan = await fetch(`${BASE}/api/payments/intent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', cookie },
+    body: JSON.stringify({ planId: 'century' }),
+  })
+  pass('invalid plan rejected', badPlan.status === 400)
 
   /* --- 9. Unauthenticated intent rejected --- */
   const noAuthIntent = await fetch(`${BASE}/api/payments/intent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'ACCESS' }),
+    body: JSON.stringify({ planId: 'day' }),
   })
   pass('intent requires session', noAuthIntent.status === 401)
 

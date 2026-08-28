@@ -1,21 +1,25 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSessionUser, cookieFromRequest } from '@/lib/auth/session'
-import { pricing, subscriptionPackages, authConfig, chain, treasuryAddress } from '@/lib/config'
+import {
+  subscriptionPackages,
+  isLifetimeUntil,
+  authConfig,
+  chain,
+  treasuryAddress,
+} from '@/lib/config'
 import { penguToWei } from '@/lib/payments/onchain'
-import { rateLimit, clientIp } from '@/lib/rate-limit'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
-type IntentType = 'ACCESS' | 'SIGNAL_DAY' | 'SUBSCRIPTION'
-
 /**
- * Create a payment intent.
- * Body: { type: 'ACCESS' | 'SIGNAL_DAY' | 'SUBSCRIPTION', days?: number }
+ * Create a subscription payment intent.
+ * Body: { planId: 'day' | 'week' | 'month' | 'year' | 'lifetime' }
  *
  * Returns the exact amount (PENGU + wei) and the treasury address so the
  * wallet can execute a plain ERC-20 transfer. Nothing is trusted from the
- * client except the intent type.
+ * client except the plan id — the amount always resolves server-side.
  */
 export async function POST(req: Request) {
   const user = await getSessionUser(cookieFromRequest(req))
@@ -24,39 +28,27 @@ export async function POST(req: Request) {
   const rl = rateLimit(`intent:${user.address}`, 12, 60_000)
   if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
 
-  let body: { type?: string; days?: number }
+  let body: { planId?: string }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: 'invalid_body' }, { status: 400 })
   }
 
-  const type = body.type as IntentType
-  let days: number | null = null
-  let units: number
+  const pkg = subscriptionPackages.find((p) => p.id === body.planId)
+  if (!pkg) return NextResponse.json({ error: 'invalid_plan' }, { status: 400 })
 
-  if (type === 'ACCESS') {
-    if (user.accessGranted) {
-      return NextResponse.json({ error: 'already_granted' }, { status: 400 })
-    }
-    units = pricing.accessFee
-  } else if (type === 'SIGNAL_DAY') {
-    units = pricing.dailySignal
-  } else if (type === 'SUBSCRIPTION') {
-    const pkg = subscriptionPackages.find((p) => p.days === Number(body.days))
-    if (!pkg) return NextResponse.json({ error: 'invalid_package' }, { status: 400 })
-    days = pkg.days
-    units = pkg.price
-  } else {
-    return NextResponse.json({ error: 'invalid_type' }, { status: 400 })
+  // Lifetime owners already have everything — nothing left to buy.
+  if (isLifetimeUntil(user.subscriptionUntil)) {
+    return NextResponse.json({ error: 'already_lifetime' }, { status: 400 })
   }
 
-  const amountWei = penguToWei(units)
+  const amountWei = penguToWei(pkg.price)
   const intent = await db.paymentIntent.create({
     data: {
       userId: user.id,
-      type,
-      days,
+      type: 'SUBSCRIPTION',
+      days: pkg.days,
       amountWei,
       chainId: chain.id,
       expiresAt: new Date(Date.now() + authConfig.paymentIntentTtlMs),
@@ -65,9 +57,10 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     intentId: intent.id,
-    type,
-    days,
-    amountPengu: units,
+    type: 'SUBSCRIPTION',
+    planId: pkg.id,
+    days: pkg.days,
+    amountPengu: pkg.price,
     amountWei,
     treasuryAddress,
     tokenAddress: process.env.NEXT_PUBLIC_APP_NETWORK === 'testnet'

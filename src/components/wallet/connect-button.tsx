@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAccount, useSwitchChain, useReadContract } from 'wagmi'
 import { useLoginWithAbstract } from '@abstract-foundation/agw-react'
 import { erc20Abi, formatUnits } from 'viem'
-import { ChevronDown, Copy, ExternalLink, LogOut, Loader2, ShieldCheck, Award, UserRound, WifiOff } from 'lucide-react'
+import { ChevronDown, Copy, ExternalLink, LogOut, Loader2, ShieldCheck, Award, UserRound, WifiOff, Crown, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -93,6 +93,7 @@ function AgwConnectButton() {
   const hasPortalProfile = !!portalProfile?.user
 
   const sessionAddress = session.data?.user?.address ?? null
+  const sessionUser = session.data?.user ?? null
   const authed = !!sessionAddress
   const wrongNetwork = isConnected && chainId !== appChain.id
 
@@ -238,6 +239,32 @@ function AgwConnectButton() {
                 {penguBalanceLabel ?? '—'}
               </span>
             </span>
+            {sessionUser && (
+              <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                {sessionUser.hasSubscription ? (
+                  <>
+                    <Crown className="size-3.5 shrink-0 text-accent" />
+                    <span className="font-semibold text-accent">
+                      {sessionUser.isLifetime
+                        ? t.sub.lifetimeActive
+                        : tf(t.auth.subDaysLeft, { days: fmt(sessionUser.daysLeft ?? 0) })}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="text-muted-foreground">{t.auth.noSubscription}</span>
+                    <a
+                      href="#pricing"
+                      className="font-semibold text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t.auth.choosePlan} →
+                    </a>
+                  </>
+                )}
+              </span>
+            )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem
