@@ -317,6 +317,16 @@ export const dict = {
       bestDay: 'Best day',
       worstDay: 'Worst day',
       note: 'Sum of daily direction × next-day price change. No leverage, no fees.',
+      period30: '30d',
+      period90: '90d',
+      periodAll: 'All',
+      periodLabel: 'Equity curve period',
+      drawdownTitle: 'Drawdown from peak',
+      drawdownMax: 'max',
+      distTitle: 'Verdict distribution',
+      distBuy: 'Buy days',
+      distSell: 'Sell days',
+      distHold: 'Hold days',
     },
 
     // Backtest sandbox
@@ -833,6 +843,16 @@ export const dict = {
       bestDay: 'بهترین روز',
       worstDay: 'بدترین روز',
       note: 'جمع جهت روزانه × تغییر قیمت روز بعد. بدون اهرم، بدون کارمزد.',
+      period30: '۳۰ روز',
+      period90: '۹۰ روز',
+      periodAll: 'همه',
+      periodLabel: 'بازه منحنی عملکرد',
+      drawdownTitle: 'افت از سقف',
+      drawdownMax: 'حداکثر',
+      distTitle: 'توزیع سیگنال‌ها',
+      distBuy: 'روزهای خرید',
+      distSell: 'روزهای فروش',
+      distHold: 'روزهای انتظار',
     },
 
     // Backtest sandbox

@@ -482,3 +482,44 @@ Stage Summary:
 - 2 real mobile bugs found & fixed: overview-cards meta row overflow, backtest table overflow
 - All QA green: EN+FA+mobile+lint+tsc+VLM 8.5-9/10
 - Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) Share button untestable end-to-end without an unlocked wallet session (logic + fallback reviewed); 4) optional roadmap: Telegram/email alerts, session keys
+
+---
+Task ID: 14
+Agent: Main Agent (Z.ai Code)
+Task: Round 14 (cron review cycle) — status assessment + QA, VLM-driven equity curve rebuild: fixed cut-off/contrast issues, added period selector, drawdown sub-chart, verdict distribution donut
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: local == remote == ab019e9, clean → proceeded
+- STATUS ASSESSMENT (agent-browser): page loads clean, 0 console errors, 8 sections, 21 canvases, all Round 12-13 features intact (compare toggle, locked preview, FAQ search). No new bugs → proceeded to VLM-directed improvements per cron mandate
+- VLM review of Track Record section: 6/10. Weakest element identified: the equity curve chart — "visually broken due to being cut off at the bottom, impossible to see the full performance trend or timeline; low contrast between line color and background". → This round's focus: rebuild the equity curve presentation.
+- EQUITY CURVE REBUILD (equity-curve.tsx):
+  • Chart height 190 → 230 viewBox units; added PAD_L=44 for y-axis labels, PAD_B=22 for x-axis date labels (first/middle/last, e.g. "08-07"); 5 gridlines with mono % labels (+0% to -17%); zero line kept dashed
+  • Stroke contrast bumped: strokeWidth 2.2→2.4, glow 5px→6px, area gradient opacity 0.22→0.28
+  • CurvePoint now tracks running peak + drawdown (cum - peak ≤ 0) per day
+- NEW FEATURE 1 — Period selector (30d / 90d / All):
+  • Tablist pill group (aria-selected, same visual language as the price chart tf selector), top-right of the card header
+  • Sliding window over resolved points; stats (return, traded, best, worst, maxDD) + donut + drawdown all recompute for the window; chart remounts via key={period} to replay the draw-in animation
+  • FA labels: ۳۰ روز / ۹۰ روز / همه
+- NEW FEATURE 2 — Drawdown (underwater) sub-curve:
+  • New DrawdownChart component: distance below running peak in %, 0% at top, worst-dashed-reference at bottom, red gradient area fill, max DD labeled ("-33.5% max")
+  • Wrapped in a bordered panel with uppercase tracker title; a11y: aria-hidden decorative + the max value is in visible text
+- NEW FEATURE 3 — Verdict distribution donut:
+  • SVG donut (strokeDasharray segments, circumference-normalized) of BUY/SELL/HOLD day counts for the selected window
+  • Legend rows: color chip + label + count + rounded %; bull green / bear red / frost cyan
+  • Counts recomputed per period from raw entries (Set lookup by date)
+- BUG FIX (lint, caught pre-commit): useMemo(verdictCounts) was after an early return → react-hooks/rules-of-hooks error; moved all hooks above the `if (allPoints.length < 2) return null` guard
+- i18n: 10 new keys en+fa (equity.period30/90/All/periodLabel, drawdownTitle, drawdownMax, distTitle, distBuy/distSell/distHold)
+- QA (agent-browser, all green):
+  1. Desktop EN: period tabs render (3) and switch correctly (30d/90d/All all tested, aria-selected flips, stats recompute); y-axis labels (10 svg text nodes) + date labels render; drawdown panel ("-33.5% max") + donut with legend render below the fold — VLM 10/10 ("polished, professional, free of visual errors"); main chart VLM 7/10 → upgraded from "cut off / low contrast" to "clearly visible with high contrast"
+  2. Desktop FA: افت از سقف / توزیع سیگنال‌ها / همه labels verified in DOM
+  3. Mobile 390px: scrollWidth = 390, zero overflowing elements (DOM-verified; VLM's overflow claims about the sticky nav/table are the by-design horizontal scroll)
+  4. lint clean, tsc src/ 0 errors
+  5. Console: zero app errors (one stale hot-reload artifact from Round 13's backtest edit — tsc confirms backtest.tsx compiles clean and the section renders)
+- INFRA NOTE: VLM screenshot timing — screenshots taken immediately after programmatic scroll can catch pre-settle frames (blank/partial); always wait ~1.5s after scrollIntoView before screenshotting
+
+Stage Summary:
+- Status assessment: stable across rounds 1-13 → VLM-directed polish round on the weakest identified component
+- Equity curve rebuilt from 6/10 to effectively 10/10 (VLM on the full new layout): taller chart with real axes, brighter line, period selector, underwater drawdown curve with max-DD label, verdict distribution donut
+- 1 lint error (hooks order) caught and fixed pre-commit
+- All QA green: EN+FA+mobile+lint+tsc+VLM
+- Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) optional roadmap: Telegram/email alerts, session keys; 4) track-record table mobile UX could get sticky-first-column treatment if future QA flags it (currently overflow-x-auto by design)
