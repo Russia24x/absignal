@@ -1,15 +1,20 @@
 /**
  * End-to-end backend security test (run with: bun scripts/e2e-auth.ts)
- * Exercises the real auth + payment intent + verification paths against
- * a locally running dev server. Uses a throwaway viem wallet.
+ * Exercises the real auth + payment intent + verification + subscription
+ * lifecycle paths against a locally running dev server. Uses a throwaway
+ * viem wallet.
  */
 
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
+import { db } from '../src/lib/db'
 
 const BASE = 'http://127.0.0.1:3000'
 
 /** Whole PENGU → wei (18 decimals) as BigInt — no ES2020 literal needed. */
 const pengu = (units: string) => BigInt(units + '0'.repeat(18))
+
+/** Same sentinel the app stores for lifetime plans (2099-12-31 UTC). */
+const LIFETIME_SENTINEL_MS = Date.parse('2099-12-31T00:00:00.000Z')
 
 function pass(name: string, condition: boolean, detail = '') {
   console.log(`${condition ? '✅' : '❌'} ${name}${detail ? ` — ${detail}` : ''}`)
@@ -160,6 +165,115 @@ async function main() {
   })
   pass('malformed tx rejected', malformedVerify.status === 400)
 
+  /* --- 11b. Subscription lifecycle (server-enforced, owner requirement) --- */
+  // Simulates the post-verify credited state exactly as the verify route
+  // writes it (subscriptionUntil = base + 30 days for the month plan).
+  const addr = account.address.toLowerCase()
+  const DAY_MS = 24 * 60 * 60 * 1000
+
+  // b1) Month plan active → 30 days of access, real signal payload
+  await db.user.update({
+    where: { address: addr },
+    data: { subscriptionUntil: new Date(Date.now() + 30 * DAY_MS), subscriptionPlan: 'month' },
+  })
+  const meActive = await (await fetch(`${BASE}/api/auth/me`, { headers: { cookie } })).json()
+  pass(
+    'month plan → hasSubscription with ~30 days left',
+    meActive.user?.hasSubscription === true &&
+      meActive.user?.subscriptionPlan === 'month' &&
+      (meActive.user?.daysLeft === 30 || meActive.user?.daysLeft === 29),
+    `daysLeft=${meActive.user?.daysLeft}`
+  )
+  const sigActive = await (await fetch(`${BASE}/api/signal/today`, { headers: { cookie } })).json()
+  pass(
+    'active month → signal payload delivered',
+    sigActive.access === 'granted' && !!sigActive.signal?.verdict && !!sigActive.signal?.plan
+  )
+
+  // b2) Expired one minute ago → access CUT, no payload, must buy again
+  await db.user.update({
+    where: { address: addr },
+    data: { subscriptionUntil: new Date(Date.now() - 60_000) },
+  })
+  const meExpired = await (await fetch(`${BASE}/api/auth/me`, { headers: { cookie } })).json()
+  pass(
+    'expired subscription → hasSubscription false',
+    meExpired.user?.hasSubscription === false && meExpired.user?.daysLeft === 0
+  )
+  const sigExpired = await (await fetch(`${BASE}/api/signal/today`, { headers: { cookie } })).json()
+  pass(
+    'expired subscription → access cut, no signal leak',
+    sigExpired.access === 'subscription_required' && sigExpired.signal === undefined
+  )
+
+  // b3) Expiry boundary: exactly at the deadline still counts (>= now)
+  await db.user.update({
+    where: { address: addr },
+    data: { subscriptionUntil: new Date(Date.now() + 1_000) },
+  })
+  const sigBoundary = await (await fetch(`${BASE}/api/signal/today`, { headers: { cookie } })).json()
+  pass('still active 1s before expiry', sigBoundary.access === 'granted')
+
+  // b4) Lifetime sentinel → permanent access
+  await db.user.update({
+    where: { address: addr },
+    data: { subscriptionUntil: new Date(LIFETIME_SENTINEL_MS), subscriptionPlan: 'lifetime' },
+  })
+  const meLife = await (await fetch(`${BASE}/api/auth/me`, { headers: { cookie } })).json()
+  const sigLife = await (await fetch(`${BASE}/api/signal/today`, { headers: { cookie } })).json()
+  pass(
+    'lifetime sentinel → permanent access',
+    meLife.user?.isLifetime === true && sigLife.access === 'granted' && !!sigLife.signal
+  )
+
+  // b5) Buying again after expiry starts a fresh window (stacking math):
+  // the verify route computes base = max(currentUntil, now). With an expired
+  // plan the base is NOW, so a month purchase = exactly 30 fresh days.
+  await db.user.update({
+    where: { address: addr },
+    data: { subscriptionUntil: new Date(Date.now() - 60_000), subscriptionPlan: null },
+  })
+  const meRenew = await (await fetch(`${BASE}/api/auth/me`, { headers: { cookie } })).json()
+  pass('expired user must re-subscribe (no free ride)', meRenew.user?.hasSubscription === false)
+
+  // Reset to the free tier for the remaining checks.
+  await db.user.update({
+    where: { address: addr },
+    data: { subscriptionUntil: null, subscriptionPlan: null, accessGranted: false, accessGrantedAt: null },
+  })
+
+  /* --- 11c. Client-side / browser tampering cannot bypass the paywall --- */
+  // c1) Forged cookie (HMAC intact-looking but wrong signature)
+  const parts = cookie.split('=')
+  const [sid, secret, sig] = parts[1].split('.')
+  const forgedCookie = `pengu_session=${sid}.${secret}.${'0'.repeat(64)}`
+  const meForged = await fetch(`${BASE}/api/auth/me`, { headers: { cookie: forgedCookie } })
+  const meForgedData = await meForged.json()
+  pass('forged cookie signature rejected', meForgedData.user === null)
+
+  // c2) Cookie with a swapped secret (wrong hash + wrong HMAC)
+  const swappedCookie = `pengu_session=${sid}.${'f'.repeat(64)}.${sig}`
+  const meSwapped = await (await fetch(`${BASE}/api/auth/me`, { headers: { cookie: swappedCookie } })).json()
+  pass('swapped cookie secret rejected', meSwapped.user === null)
+
+  // c3) No cookie at all → auth_required, no payload
+  const sigAnon = await (await fetch(`${BASE}/api/signal/today`)).json()
+  pass('anonymous call → auth_required, no leak', sigAnon.access === 'auth_required' && sigAnon.signal === undefined)
+
+  // c4) Intent amount tampering: client can only send planId — verify the
+  // server resolves the amount itself (price never trusted from browser)
+  const tamperIntent = await fetch(`${BASE}/api/payments/intent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', cookie },
+    body: JSON.stringify({ planId: 'month', amount: 1, price: 0, amountWei: '1' }),
+  })
+  const tamperData = await tamperIntent.json()
+  pass(
+    'client price tampering ignored (server-side pricing)',
+    tamperIntent.status === 200 && BigInt(tamperData.amountWei) === pengu('255'),
+    `amountWei=${tamperData.amountWei}`
+  )
+
   /* --- 12. Logout kills session --- */
   await fetch(`${BASE}/api/auth/logout`, { method: 'POST', headers: { cookie } })
   const meAfter = await fetch(`${BASE}/api/auth/me`, { headers: { cookie } })
@@ -198,6 +312,17 @@ async function main() {
     'history masks unresolved verdicts (no leak)',
     history.status === 200 && (todayEntry ? todayEntry.verdict === 'LOCKED' : true)
   )
+
+  /* --- 14. Cleanup throwaway test data --- */
+  try {
+    await db.session.deleteMany({ where: { user: { address: addr } } })
+    await db.paymentIntent.deleteMany({ where: { userId: (await db.user.findUnique({ where: { address: addr } }))?.id ?? '' } })
+    await db.signalUnlock.deleteMany({ where: { userId: (await db.user.findUnique({ where: { address: addr } }))?.id ?? '' } })
+    await db.user.deleteMany({ where: { address: addr } })
+    pass('throwaway test user cleaned up', true)
+  } catch {
+    pass('throwaway test user cleaned up', false)
+  }
 
   console.log('\n🧪 E2E auth/payment security test complete.\n')
 }

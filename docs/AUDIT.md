@@ -3,8 +3,11 @@
 > Scope: every file under `src/`, `prisma/`, `scripts/`, plus runtime behavior
 > of the running dev server. Triggered by the owner: full audit of
 > architecture, core, security, execution — **deployment halted** during and
-> after the audit until explicitly lifted. Automated development continues on
-> a 15-minute review cycle.
+> after the audit until explicitly lifted.
+>
+> ⛔ UPDATE (R23): the automated 15-minute review cycle was later
+> **permanently removed by owner directive** — no scheduled development
+> review runs anymore.
 
 **Verdict: PASS with 2 security fixes applied during the audit (A-1, A-2)
 and 1 correctness guard added (A-4). No blocking findings remain.**
@@ -105,6 +108,6 @@ gracefully degraded.
 | A-5 | Info | Ops | In-memory market cache lost on restart; upstream throttle → transient 502 | Accepted (sandbox); KV/DO documented for production |
 | A-6 | Info | Testing | E2E "candles public" conflated availability with security | Hardened — exponential backoff, judges only 401/403 as failure |
 
-*Audit performed by the main agent (Z.ai Code), Round 17. Automated 15-minute
-review cycles continue per owner instruction; each cycle re-runs QA and
-records to `worklog.md`.*
+*Audit performed by the main agent (Z.ai Code), Round 17. ⛔ The automated
+15-minute review cycles were later permanently removed by owner directive
+(R18, reaffirmed R23); no scheduled dev-review job exists or may be created.*

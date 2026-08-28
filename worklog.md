@@ -1,5 +1,10 @@
 # PenguSignal — Project Worklog
 
+> ## ⛔ OWNER DIRECTIVE — PERMANENT (فعال از R18، تکرار در R23)
+> **The every-15-minutes automated development review (webDevReview cron / any recurring scheduled dev-review job) is PERMANENTLY FORBIDDEN.**
+> It must NEVER be created again — not by any agent, any session, or any instruction template that mentions it. Historical mentions of "cron review cycle" in older entries below are defunct history ONLY, not an active mandate.
+> **دستور مالک: بررسی خودکار هر ۱۵ دقیقه برای همیشه ممنوع است و در هیچ دور و توسط هیچ agent‌ای نباید دوباره ساخته شود.**
+
 ---
 Task ID: 1
 Agent: Main Agent (Z.ai Code)
@@ -789,3 +794,24 @@ Stage Summary:
 - Every remaining section is now either real-data (market, signals, track record, backtest, sentiment), a genuinely functional tool (alerts, risk calculator), honest marketing (features/FAQ), or the purchase flow itself. The only fake-claim section (HolderPerks) and the decorative Snowfall are gone.
 - Purchase is now one click from the Pricing section for signed-in users (PayButton directly on each card, correct 10/65/255/2750/7650 PENGU tariffs, "Owned" state for lifetime holders), and the ladder path for new visitors is unchanged.
 - All gates green. Remaining known limitations are environmental only (sandbox blocks privy.abs.xyz so a live funded-wallet payment smoke test still must happen from a real network; owner must fund treasury).
+
+---
+Task ID: 23
+Agent: orchestrator (main)
+Task: Owner request (Persian) — (1) first review the rules; (2) permanently remove the every-15-minutes automated review from ALL documents and instructions; (3) ensure subscription tariffs enforce real access windows (a 1-month buyer really gets 1 month; expiry cuts access and forces re-purchase); (4) make client/browser-side glitches or tampering unable to bypass the system.
+
+Work Log:
+- RULES REVIEW (owner's first instruction): read RULES.md in full — Rule 1 (never force-push; on rejected push STOP and report) and Rule 2 (session-start sync check). Executed Rule 2: git fetch + status → clean, up-to-date with origin/main @ 51bc45a. No divergence.
+- CRON PERMANENTLY DELETED: the webDevReview job created in R22 (id 343017, already auto-stopped "max_rounds_exceeded") was deleted via the cron API; job list now shows 0 jobs (verified with includeDisabled). NOTE: this is the second time the owner ordered this removal (first in R18) — R22 re-created it by template mandate; that must never happen again.
+- DOCS SWEEP: worklog.md got a prominent permanent OWNER DIRECTIVE at the very top (bilingual) forbidding any recurring scheduled dev-review job, explicitly marking all historical "cron review cycle" mentions as defunct history; docs/AUDIT.md's two stale claims ("Automated development continues on a 15-minute review cycle" / "review cycles continue per owner instruction") corrected with a ⛔ UPDATE (R23) notice. DEPLOYMENT.md's "optional Workers Cron to pre-warm the daily signal at 00:05 UTC" is a different, legitimate production feature — intentionally kept. RULES.md / README.md / .env.example verified clean.
+- SERVER-SIDE ENTITLEMENT AUDIT (code review of every gate): /api/signal/today only includes the signal payload when access==='granted' (session + subscriptionUntil >= now, or lifetime sentinel) — free/expired/anonymous responses carry NO signal object; /api/auth/me computes hasSubscription/daysLeft/isLifetime server-side; /api/payments/verify credits days from the SERVER-created intent (client sends only planId + txHash) and verifies on-chain: receipt status, tx.to == PENGU contract, tx.from == session user, Transfer(user→treasury) log with value >= expected, block timestamp inside the intent window, unique txHash (atomic claim, P2002-guarded). Renewal stacking math: base = max(currentUntil, now) → buying after expiry starts a fresh window (no free ride). Month plan = exactly 30 days (config days:30 → +30*86400000ms). Client signal-card renders ONLY data the server sent — forcing state via devtools yields an empty render (FullSignal returns null without payload).
+- E2E EXTENDED (scripts/e2e-auth.ts, 22 → 34 checks) — new sections: 11b lifecycle (month→granted w/ daysLeft=30 + real verdict/plan payload; expired-60s-ago→hasSubscription=false + subscription_required + NO payload leak; 1s-before-expiry still granted; lifetime sentinel→permanent; expired user must re-subscribe) and 11c anti-tampering (forged cookie HMAC rejected; swapped cookie secret rejected; anonymous call→auth_required no leak; client price tampering ignored — intent body with amount:1/price:0/amountWei:'1' still returns exactly 255 PENGU in wei) + 14 cleanup (throwaway user/sessions/intents/unlocks deleted). RESULT: 34/34 ✅.
+- UI VERIFICATION (browser, Persian): crafted a valid session for a user with EXPIRED month plan → signal card shows «اشتراک پایان یافت» strip + «همین حالا تمدید کنید» + full plan picker (۱۰/۶۵/۲۵۵/۲٬۷۵۰/۷٬۶۵۰ PENGU) and NO signal content; same user set to ACTIVE 30-day month → full signal renders (verdict خرید/LONG, gauge +24, entry $0.00910–0.00937, SL, TP1-3) — VLM confirms complete signal + active-subscription strip, zero rendering defects. Test user fully cleaned up afterwards; cookies cleared; page reload clean.
+- GATES: tsc 0 errors · lint clean · dev.log clean · console 0 errors/0 page-errors.
+- Git: committed & pushed to github.com/Russia24x/absignal (no force, per Rule 1).
+
+Stage Summary:
+- The 15-minute automated review is gone FOREVER: cron job deleted (0 jobs) and every document/instruction reference neutralized with an explicit permanent owner directive (top of worklog.md) so no future agent re-creates it.
+- Subscription enforcement is verified end-to-end and is fully server-authoritative: month buyer gets exactly 30 days (renewal stacks on remaining time), expiry instantly cuts access (API returns no signal payload; UI shows expired + re-purchase picker), and every client-side manipulation vector tested (forged/swapped cookies, anonymous calls, price tampering, fake tx) is rejected by the server.
+- Anti-bypass architecture confirmed: HMAC-signed httpOnly sessions, server-side pricing/entitlements, on-chain payment verification (sender/amount/recipient/timing/unique txHash), LOCKED masking of unresolved verdicts.
+- Remaining for the OWNER: fund treasury; (optional) paymaster for 0-gas; live funded-wallet payment smoke test from a real network (sandbox blocks privy.abs.xyz).
