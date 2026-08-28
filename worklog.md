@@ -135,3 +135,27 @@ Stage Summary:
   1. Full AGW payment E2E on mainnet requires a real funded AGW (email-login account + ETH + PENGU) — code paths typecheck, verify logic unchanged & E2E-tested with EOA; a live human smoke test is the remaining acceptance step
   2. Cloudflare deployment (docs ready) — needs owner's account
   3. Optional next features: AGW session-key based true auto-renew subscription (1 PENGU/day charging while user is offline — createSession/toSessionClient APIs exist in agw-client), Telegram/email alerts for subscribers, backtest sandbox UI
+
+---
+Task ID: 5
+Agent: Main Agent (Z.ai Code)
+Task: GitHub setup per owner's directive — push project to github.com/Russia24x/absignal, add RULES.md (NEVER-FORCE-PUSH + SESSION-START-SYNC-CHECK), run the session-start sync check and report
+
+Work Log:
+- Executed owner's SESSION-START-SYNC-CHECK (first run of this protocol): `git fetch origin` → remote repo EXISTS and is completely EMPTY (no branches, no refs — NO "soft-lock fix" commit had ever landed on it; the local repo had NO remote configured at all before this session). Verdict: nothing to be behind/diverged from → clean to proceed
+- SECURITY (pre-push audit): discovered `.env` (SESSION_SECRET + all config) and `db/custom.db` (real user/session/payment data) were TRACKED in git, with `.env` present in 3 of 5 historical commits and the DB in 4. Pushing the old history would have leaked secrets
+- Solution (remote was empty → zero divergence risk, normal push): built a CLEAN single-commit history via `git checkout --orphan` — 126 files staged (src, prisma, docs, scripts, public, configs, README, RULES.md, worklog.md), secrets/sandbox-infra explicitly removed from index. Old 5-commit history preserved locally as branch `sandbox-history-backup` (NEVER push this branch — it contains .env in history)
+- .gitignore hardened: added `/db/`, `*.db`, `*.db-journal`, `/.zscripts/`, `Caddyfile`, `/download/` (9.6MB QA screenshots), `/examples/`, `/mini-services/`, `/tests/` (sandbox runtime scripts, not app code), `agent-ctx/`
+- Created RULES.md at repo root (bilingual FA/EN) with the owner's two non-negotiable rules: (1) NEVER-FORCE-PUSH — any force push absolutely forbidden; if a normal push is rejected (non-fast-forward) → STOP immediately, report local/remote state, wait for owner's decision; history rewriting of pushed commits also forbidden. (2) SESSION-START-SYNC-CHECK — at the start of every session and after any time gap, BEFORE any new change: fetch → status → compare local vs origin/main; if behind/diverged → STOP and report; only proceed if clean/identical; state the check result at the top of the session report
+- Local commit created: `be804c0 "Initial release: PenguSignal — PENGU daily signal platform on Abstract"`
+- PUSH ATTEMPT → FAILED with 403 "Permission to Russia24x/absignal.git denied to Russia24x"
+- Root cause (diagnosed precisely, non-destructively): the owner's fine-grained PAT authenticates as Russia24x and has READ access (fetch/ls-remote/GET work), but LACKS "Contents: Read and write" — a POST git/blobs API probe returned 403 "Resource not accessible by personal access token". This is a token-permission issue, NOT a sync/divergence conflict. No credential-helper interference (none configured). Per RULES → stopped, reporting, awaiting owner action
+- Dev server verified healthy during this round: /api/config returns full mainnet config (configOk), AGW app untouched
+
+Stage Summary:
+- RULES.md created and committed; sync-check protocol executed and now a permanent rule for every future session
+- Clean secret-free history ready at local main (be804c0); remote github.com/Russia24x/absignal still EMPTY
+- BLOCKED ON OWNER: the provided fine-grained PAT needs "Contents: Read and write" permission (GitHub → Settings → Developer settings → Personal access tokens → edit/regenerate so the token includes repo absignal with Contents read+write). Once a valid token is provided, the single command `git push -u origin main` completes the sync (remote empty → normal push, no force, no divergence)
+- Remote origin is configured locally with the token in the URL (in .git/config — never commit this)
+- FOR FUTURE AGENTS: 1) NEVER push branch `sandbox-history-backup` (contains .env in history). 2) ALWAYS run the RULES.md sync check before work. 3) If push 403s again → token still lacks write; stop and ask owner. 4) After a successful push, verify with fetch + `git diff origin/main main` (must be empty) and report "identical"
+- Unresolved/next-phase items (unchanged from round 4, plus): pending GitHub push (token permission), then continue feature roadmap (AGW session-key auto-renew, Telegram alerts, backtest sandbox)
