@@ -523,3 +523,52 @@ Stage Summary:
 - 1 lint error (hooks order) caught and fixed pre-commit
 - All QA green: EN+FA+mobile+lint+tsc+VLM
 - Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) optional roadmap: Telegram/email alerts, session keys; 4) track-record table mobile UX could get sticky-first-column treatment if future QA flags it (currently overflow-x-auto by design)
+
+---
+Task ID: 15
+Agent: Main Agent (Z.ai Code)
+Task: Round 15 (cron review cycle) — status assessment + agent-browser QA, VLM-directed round: 2 new features (Risk & Position Size Calculator, Final CTA banner) + styling polish on Features/Pricing/FAQ/Footer + a false-alarm console-artifact investigation
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: local == remote == 6eae1ba (Round 14), tree clean → proceeded
+- STATUS ASSESSMENT (agent-browser): page loads clean, 12 sections (now incl. risk calculator + CTA banner), 21 chart canvases, EN LTR + FA RTL both render, mobile 390px scrollWidth=390 no overflow, live data flowing (PENGU $0.00929). No new bugs → proceeded to VLM-directed improvements per cron mandate
+- VLM review of the 4 least-recently-reviewed sections: Features 6.5/10 (uneven card heights, weak card definition, no hover affordance, indicator list not scannable), Pricing 6.5/10 (popular card indistinct, unit alignment, CTA affordance), Perks 7.5/10 (fine), FAQ+footer area 5.5/10 — WEAKEST: "massive unexplained gap between last FAQ accordion and footer — page ends flat, kills momentum, looks broken" → this round's focus: fix the flat ending + add a real trader tool
+- QA-TOOLING BUG FOUND & FIXED (my own tooling): `scrollIntoView` + `scrollBy(0,-70)` raced with CSS smooth-scroll — scrollBy executed at scrollY=0 and clamped, silently canceling the scroll; earlier screenshots of "Features" actually captured the hero (VLM described hero content — caught the mismatch). Fixed by computing `window.scrollTo({top: rect.top + scrollY - 84, behavior: 'instant'})`. Also upgraded scripts/mobile-qa.ts to accept mode + port CLI args (was desktop-reset-only)
+- NEW FEATURE 1 — Risk & Position Size Calculator (src/components/landing/risk-calculator.tsx, section after Backtest):
+  • Inputs: account size (USD), risk-per-trade slider (0.25–10%, step 0.25) with 0.5/1/2/3/5% preset chips (aria-pressed), entry/stop/target prices (inputMode=decimal)
+  • Direction auto-detected from level geometry (stop<entry<target → LONG badge, reverse → SHORT badge) shown as the results panel header pill
+  • Outputs: risk amount, position size (USD), PENGU units, R multiple (color-coded ≥2R bull / ≥1R primary / <1R bear), profit at target, loss at stop
+  • Entry/stop/target auto-fill from the live PENGU price on first arrival (render-phase state init pattern — zero useEffect, satisfies react-hooks/set-state-in-effect lint) + "Use live price" refresh button in the toolbar strip
+  • Persian/Arabic digit normalization (۲۰۰۰ → 2000) so FA users can type natively — verified live: account=۲۰۰۰ → $100 risk at 5%
+  • Error states: entry==stop, invalid geometry (stop same side as target) → amber ShieldAlert panel
+  • Verified math in DOM: $1000@2% → $20 risk, 43,011 units, $400.09 position, 2.00R, +$39.91/−$20.00; short flip (stop 0.0098 > entry) → 0.61R correct; slider → 5% → $50 risk live recompute
+  • Custom frost slider thumb (globals.css .risk-slider, webkit+moz) — 16px gradient thumb with glow, scale on hover
+  • i18n: 24 new keys en+fa (risk.*), eyebrow.risk
+- NEW FEATURE 2 — Final CTA banner (src/components/landing/cta-banner.tsx, between FAQ and footer):
+  • Solves the VLM-flagged flat ending / footer void: the page now closes with a conversion moment instead of dropping into the footer
+  • Glass card with aurora top edge + ambient primary glow, gradient headline "Ready for today's verdict?", subtitle
+  • Live next-signal countdown (reuses useNextSignalCountdown) in a pill-status chip with colon-separated digit groups (HH : MM : SS, LTR-guarded, text-glow-pulse)
+  • Primary CTA (btn-aurora + halo, h-13, px-9) → #app; secondary (deliberately receded: border-border/60, muted text) → #pricing
+  • Trust microcopy row (honest track record / on-chain payments / locked daily verdicts) with icons
+  • Extra bottom padding (pb-16/20) for breathing room before the footer per VLM
+  • i18n: 8 new keys en+fa (ctaBanner.*)
+- STYLING POLISH (VLM-directed, Features 6.5→8, Pricing 6.5→8.5):
+  • Features: real equal-height cards (h-full added to the motion wrappers — was missing, causing jagged bottom row), new .card-ice-edge utility (faint cold gradient on card top edge, brightens + widens on hover), timeframe chips (15m/1h/4h/1d mono pills) on the engine card, uniform icon strokeWidth 1.75, eyebrow gets flanking hairlines, grid items-stretch
+  • Pricing: popular card now border-primary/50 + bg-primary/[0.04] tint + bolder badge (font-bold + glow-frost + border-primary/50), checkmarks strokeWidth 2.5, feature list space-y-2.5, CTAs py-3 with text-foreground/90 + hover:text-primary on secondary cards, price units dir=ltr + pb-0.5 aligned
+  • FAQ: chevron affordance — [&>svg]:size-5 [&>svg]:text-primary/70, rows hover:border-primary/25
+  • Footer: disclaimer box bg/border/contrast bumped (secondary/40, border/40, text/90, title /85), copyright text /90
+- FALSE-ALARM INVESTIGATION (useTrackRecord ReferenceError): agent-browser console showed `ReferenceError: useTrackRecord is not defined in <LockedPreview>` after reloads — investigated deeply: present on stashed HEAD too (not my changes), survived rm -rf .next + server restart, all compiled chunk references verified correct (proper Turbopack namespace imports, no bare identifiers). RESOLUTION: wrote scripts/capture-exception.ts (CDP Runtime.exceptionThrown listener) → 0 exceptions on fresh reloads; after `agent-browser console --clear` + reload → clean console. The error was a STALE CONSOLE ENTRY from the git-stash/stash-pop hot-reload cycle (dev server briefly served a broken intermediate module state mid-HMR). Code was and is healthy. QA lesson recorded: ALWAYS `console --clear` before judging fresh errors; agent-browser console persists entries across reloads
+- QA (all green):
+  1. Desktop EN: 12 sections, 21 canvases, LockedPreview renders (unlock checklist + Yesterday's real signal teaser + accuracy strip), risk calculator interactive (fills, slider, presets, direction flip, error states), CTA banner countdown ticks + CTAs wired + trust row
+  2. Desktop FA: full RTL, calculator title/harness Persian, Persian digit input works (۲۰۰۰ → $100), countdown LTR-guarded
+  3. Mobile 390px: scrollWidth=390, deep element scan — only intentional overflows (decorative snowflakes, glow clipped by overflow-hidden, table in its scroll container)
+  4. lint clean, tsc src/ 0 errors, E2E security suite all pass (18/18 incl. history no-leak)
+  5. VLM final quality gate: Calculator 9/10 interactive + 9/10 alignment, CTA banner PASS, "no blocking visual defects, ready for deployment"
+
+Stage Summary:
+- 2 new user-facing features: Risk & Position Size Calculator (real trader tool: sizing, R multiple, direction detection, live-price defaults, Persian digits) + Final CTA banner (closing conversion moment, live countdown, fixes the flat page ending VLM rated 5.5/10)
+- Styling polish: Features 6.5→8/10, Pricing 6.5→8.5/10, FAQ chevron affordance, Footer disclaimer contrast, new utilities .card-ice-edge + .risk-slider thumb
+- New infra: scripts/capture-exception.ts (CDP exception capture — distinguishes fresh exceptions from stale console entries); mobile-qa.ts now takes mode+port args
+- QA methodology hardened: always clear console before judging; verify screenshot scroll positions (smooth-scroll race found & fixed)
+- All QA green: EN+FA+mobile+lint+tsc+E2E+VLM
+- Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) optional roadmap: Telegram/email alerts, session keys; 4) observe: AGW loadProviderDetails fetch failure remains environment-specific (Preview Panel sandbox), gracefully degraded

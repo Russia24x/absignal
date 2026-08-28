@@ -1,8 +1,9 @@
-// Mobile viewport QA — set 390x844 (iPhone 12 Pro) via CDP
-// Usage: bun run scripts/mobile-qa.ts
+// Mobile viewport QA — set 390x844 (iPhone 12 Pro) via CDP, or reset to desktop
+// Usage: bun run scripts/mobile-qa.ts [mobile|desktop] [cdpPort]
 import WebSocket from 'ws'
 
-const CDP_PORT = 45727 // agent-browser's chrome --remote-debugging-port (random)
+const MODE = (process.argv[2] || 'mobile') as 'mobile' | 'desktop'
+const CDP_PORT = Number(process.argv[3] || 45727) // agent-browser's chrome --remote-debugging-port (random)
 const CDP_URL = `http://127.0.0.1:${CDP_PORT}/json`
 const TARGET_URL = 'http://localhost:3000'
 
@@ -35,16 +36,27 @@ async function main() {
 
   ws.on('open', async () => {
     console.log('Connected to', target.url)
-    // Reset to desktop viewport explicitly
-    await send('Emulation.setDeviceMetricsOverride', {
-      width: 1280,
-      height: 800,
-      deviceScaleFactor: 1,
-      mobile: false,
-      screenWidth: 1280,
-      screenHeight: 800,
-    })
-    console.log('Device reset to desktop 1280x800')
+    if (MODE === 'mobile') {
+      await send('Emulation.setDeviceMetricsOverride', {
+        width: 390,
+        height: 844,
+        deviceScaleFactor: 3,
+        mobile: true,
+        screenWidth: 390,
+        screenHeight: 844,
+      })
+      console.log('Device set to mobile 390x844 (iPhone 12 Pro)')
+    } else {
+      await send('Emulation.setDeviceMetricsOverride', {
+        width: 1280,
+        height: 800,
+        deviceScaleFactor: 1,
+        mobile: false,
+        screenWidth: 1280,
+        screenHeight: 800,
+      })
+      console.log('Device reset to desktop 1280x800')
+    }
     await send('Runtime.evaluate', { expression: 'window.scrollTo(0,0)' })
     await new Promise((r) => setTimeout(r, 200))
     ws.close()

@@ -148,9 +148,11 @@ export function Faq() {
                 <AccordionItem
                   key={`${i}-${item.q}`}
                   value={`q-${i}`}
-                  className="glass border border-border/60 rounded-2xl px-5 !mt-0 data-[state=open]:border-primary/30 transition-colors"
+                  className="glass border border-border/60 rounded-2xl px-5 !mt-0 hover:border-primary/25 data-[state=open]:border-primary/30 transition-colors"
                 >
-                  <AccordionTrigger className="text-start text-sm sm:text-base font-semibold hover:no-underline hover:text-primary transition-colors py-4">
+                  <AccordionTrigger
+                    className="text-start text-sm sm:text-base font-semibold hover:no-underline hover:text-primary transition-colors py-4 [&>svg]:size-5 [&>svg]:text-primary/70 [&>svg]:transition-transform"
+                  >
                     {item.q}
                   </AccordionTrigger>
                   <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4">

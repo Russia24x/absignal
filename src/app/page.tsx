@@ -14,10 +14,12 @@ import { LiveStatsStrip } from '@/components/landing/live-stats-strip'
 import { ScrollProgressBar } from '@/components/landing/scroll-progress'
 import { TrackRecord } from '@/components/landing/track-record'
 import { BacktestSandbox } from '@/components/landing/backtest'
+import { RiskCalculator } from '@/components/landing/risk-calculator'
 import { Features } from '@/components/landing/features'
 import { Pricing } from '@/components/landing/pricing'
 import { HolderPerks } from '@/components/landing/holder-perks'
 import { Faq } from '@/components/landing/faq'
+import { CtaBanner } from '@/components/landing/cta-banner'
 import { Footer } from '@/components/landing/footer'
 import { Snowfall } from '@/components/landing/snowfall'
 import { BackToTop } from '@/components/landing/back-to-top'
@@ -78,10 +80,12 @@ export default function Home() {
 
         <TrackRecord />
         <BacktestSandbox />
+        <RiskCalculator />
         <Features />
         <Pricing />
         <HolderPerks />
         <Faq />
+        <CtaBanner />
       </main>
 
       <Footer />

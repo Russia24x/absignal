@@ -136,7 +136,7 @@ export function Footer() {
         </div>
 
         <div className="mt-8 pt-6 border-t border-border/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground/90">
             © {year} {t.brand}. {t.footer.rights}
           </p>
           <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
@@ -145,9 +145,9 @@ export function Footer() {
           </p>
         </div>
 
-        <div className="mt-4 rounded-xl bg-secondary/30 border border-border/30 p-3">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            <strong className="text-foreground/80">{t.footer.disclaimerTitle}:</strong> {t.footer.disclaimer}
+        <div className="mt-4 rounded-xl bg-secondary/40 border border-border/40 p-3.5">
+          <p className="text-xs leading-relaxed text-muted-foreground/90">
+            <strong className="text-foreground/85">{t.footer.disclaimerTitle}:</strong> {t.footer.disclaimer}
           </p>
         </div>
       </div>

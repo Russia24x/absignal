@@ -92,7 +92,9 @@ export function Pricing() {
               <Card
                 className={cn(
                   'glass h-full flex flex-col relative overflow-hidden transition-all duration-300 hover:-translate-y-1',
-                  card.popular ? 'border-primary/40 glow-frost' : 'border-border/60 hover:border-primary/25'
+                  card.popular
+                    ? 'border-primary/50 glow-frost bg-primary/[0.04]'
+                    : 'border-border/60 hover:border-primary/25'
                 )}
               >
                 {card.popular && (
@@ -104,7 +106,7 @@ export function Pricing() {
                       <card.icon className="size-5" />
                     </div>
                     {card.popular && (
-                      <Badge className="bg-primary/15 text-primary border-primary/30 hover:bg-primary/15">
+                      <Badge className="bg-primary/20 text-primary border-primary/50 hover:bg-primary/20 font-bold glow-frost">
                         {t.sub.mostPopular}
                       </Badge>
                     )}
@@ -114,13 +116,13 @@ export function Pricing() {
                 </CardHeader>
                 <CardContent className="pt-0 flex flex-col flex-1 gap-4">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black tabular-nums text-gradient-frost">{card.price}</span>
-                    <span className="text-xs text-muted-foreground">{card.unit}</span>
+                    <span className="text-3xl font-black tabular-nums text-gradient-frost" dir="ltr">{card.price}</span>
+                    <span className="pb-0.5 text-[11px] font-medium text-muted-foreground">{card.unit}</span>
                   </div>
-                  <ul className="space-y-2 flex-1">
+                  <ul className="space-y-2.5 flex-1">
                     {card.points.map((point) => (
                       <li key={point} className="flex items-start gap-2 text-xs text-muted-foreground">
-                        <Check className="size-3.5 text-bull shrink-0 mt-0.5" />
+                        <Check className="size-3.5 text-bull shrink-0 mt-0.5" strokeWidth={2.5} />
                         <span className="leading-relaxed">{point}</span>
                       </li>
                     ))}
@@ -128,10 +130,10 @@ export function Pricing() {
                   <a href="#app" className="block">
                     <span
                       className={cn(
-                        'block w-full text-center rounded-xl px-4 py-2.5 text-sm font-bold transition-all',
+                        'block w-full text-center rounded-xl px-4 py-3 text-sm font-bold transition-all',
                         card.popular
                           ? 'bg-primary text-primary-foreground hover:bg-primary/90 glow-frost'
-                          : 'bg-secondary/70 border border-border/60 hover:border-primary/40 hover:bg-secondary'
+                          : 'bg-secondary/70 border border-border/60 text-foreground/90 hover:border-primary/40 hover:text-primary hover:bg-secondary'
                       )}
                     >
                       {t.pricing.cta}

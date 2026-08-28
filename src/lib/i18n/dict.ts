@@ -415,6 +415,45 @@ export const dict = {
       note: 'Payments are direct PENGU transfers to the project treasury — verified on-chain.',
     },
 
+    // Risk calculator — position sizing tool
+    risk: {
+      title: 'Size the trade before you risk it',
+      subtitle: 'Position sizing is what separates a bad day from a wiped account. Set your account, risk and levels — the calculator does the math for longs and shorts.',
+      accountLabel: 'Account size',
+      accountPlaceholder: '1000',
+      riskLabel: 'Risk per trade',
+      entryLabel: 'Entry price',
+      stopLabel: 'Stop price',
+      targetLabel: 'Target price',
+      direction: 'Direction',
+      long: 'Long',
+      short: 'Short',
+      riskAmount: 'Risk amount',
+      positionSize: 'Position size',
+      units: 'PENGU units',
+      rrMultiple: 'R multiple (target)',
+      profitAtTarget: 'Profit at target',
+      lossAtStop: 'Loss at stop',
+      useLivePrice: 'Use live price',
+      autoDetected: 'auto',
+      invalidLevels: 'Stop must sit on the opposite side of entry from the target.',
+      entryEqualsStop: 'Entry and stop cannot be equal.',
+      disclaimer: 'Sizing math only — not financial advice.',
+      presets: 'presets',
+    },
+
+    // Final CTA banner — closing conversion moment before the footer
+    ctaBanner: {
+      title: 'Ready for today’s verdict?',
+      subtitle: 'The engine has already read the market. Connect, pay 1 PENGU and see exactly where it would enter, stop and take profit.',
+      countdownLabel: 'Next signal locks in',
+      cta: 'Connect Wallet & Enter',
+      secondary: 'See pricing',
+      trust1: 'Honest track record',
+      trust2: 'On-chain payments',
+      trust3: 'Locked daily verdicts',
+    },
+
     // FAQ
     faq: {
       title: 'Frequently asked',
@@ -476,6 +515,7 @@ export const dict = {
       pricing: 'Pricing',
       faq: 'Answers',
       holderPerks: 'For PENGU holders',
+      risk: 'Risk tools',
     },
 
     // Holder Perks — landing section between Pricing and FAQ
@@ -939,6 +979,45 @@ export const dict = {
       note: 'پرداخت‌ها تراف مستقیم PENGU به کیف خزانه پروژه هستند — تأیید on-chain.',
     },
 
+    // ماشین‌حساب ریسک — ابزار محاسبه حجم پوزیشن
+    risk: {
+      title: 'قبل از ریسک، حجم معامله را حساب کن',
+      subtitle: 'مدیریت حجم معامله همان تفاوت بین یک روز بد و نابودی حساب است. حساب، ریسک و سطوح را وارد کن — ماشین‌حساب برای خرید و فروش کار می‌کند.',
+      accountLabel: 'اندازه حساب',
+      accountPlaceholder: '۱۰۰۰',
+      riskLabel: 'ریسک هر معامله',
+      entryLabel: 'قیمت ورود',
+      stopLabel: 'قیمت حد ضرر',
+      targetLabel: 'قیمت هدف',
+      direction: 'جهت',
+      long: 'خرید (لانگ)',
+      short: 'فروش (شورت)',
+      riskAmount: 'مبلغ ریسک',
+      positionSize: 'حجم پوزیشن',
+      units: 'تعداد پنگو',
+      rrMultiple: 'ضریب R (هدف)',
+      profitAtTarget: 'سود در هدف',
+      lossAtStop: 'ضرر در حد ضرر',
+      useLivePrice: 'قیمت لحظه‌ای',
+      autoDetected: 'خودکار',
+      invalidLevels: 'حد ضرر باید سمت مخالف ورود نسبت به هدف باشد.',
+      entryEqualsStop: 'ورود و حد ضرر نمی‌توانند برابر باشند.',
+      disclaimer: 'فقط محاسبه حجم است — توصیه مالی نیست.',
+      presets: 'پیش‌تنظیم',
+    },
+
+    // بنر دعوت پایانی — لحظه تبدیل پایانی قبل از فوتر
+    ctaBanner: {
+      title: 'برای سیگنال امروز آماده‌ای؟',
+      subtitle: 'موتور بازار را خوانده است. وصل شو، ۱ پنگو پرداخت کن و ببین دقیقاً کجا وارد می‌شود، حد ضرر و هدف‌ها کجاست.',
+      countdownLabel: 'قفل سیگنال بعدی',
+      cta: 'اتصال کیف پول و ورود',
+      secondary: 'دیدن تعرفه‌ها',
+      trust1: 'سابقه صادقانه',
+      trust2: 'پرداخت on-chain',
+      trust3: 'سیگنال‌های قفل روزانه',
+    },
+
     faq: {
       title: 'سؤالات متداول',
       searchPlaceholder: 'جستجوی سؤالات…',
@@ -998,6 +1077,7 @@ export const dict = {
       pricing: 'تعرفه',
       faq: 'پاسخ‌ها',
       holderPerks: 'برای دارندگان پنگو',
+      risk: 'ابزار ریسک',
     },
 
     // مزایای دارندگان پنگو — بخش بین تعرفه و سؤالات متداول
