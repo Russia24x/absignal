@@ -266,6 +266,11 @@ function PlanGrid() {
                 : `${fmt(p.days)} ${lang === 'fa' ? 'روز' : p.days === 1 ? 'day' : 'days'}`}
             </span>
             <span className="text-sm font-black">{fmt(p.price)} PENGU</span>
+            {p.discountPct > 0 && (
+              <span className="text-[9px] font-bold leading-none text-bull" dir="ltr">
+                −{fmt(p.discountPct)}%
+              </span>
+            )}
           </PayButton>
         ))}
       </div>

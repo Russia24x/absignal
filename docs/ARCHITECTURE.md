@@ -84,8 +84,10 @@ market data from day one (each historical row stores `invalidation: "historical"
 
 - **Free tier**: wallet registration + signature login cost nothing; signed-in users
   get market data, track record, backtest and risk calculator. Signals stay locked.
-- **Plans** (`subscriptionPackages` in `config.ts`, env-tunable): day 10 / week 5 /
-  month 30 / year 100 / lifetime 1500 PENGU.
+- **Plans** (`subscriptionPackages` in `config.ts`, env-tunable): the Round-17 staircase —
+  day 10 / week 65 (7% off) / month 255 (15% off) / year 2750 (25% off) /
+  lifetime 7650 PENGU (30% cap, 3-year linear base 10950). 1 day = 10 PENGU is the
+  fixed baseline; `validateConfig()` enforces monotonic per-day rates + the 30% cap.
 - `POST /api/payments/intent` takes only `{ planId }` — the server resolves the amount,
   treasury and chain, and stores a `PaymentIntent` (`type: 'SUBSCRIPTION'`, `days: null`
   for lifetime). Lifetime owners get `already_lifetime` — nothing left to buy.

@@ -103,8 +103,8 @@ async function main() {
   })
   const monthData = await monthIntent.json()
   pass(
-    'month intent with exact amount (30 PENGU)',
-    monthIntent.status === 200 && BigInt(monthData.amountWei) === pengu('30')
+    'month intent with exact amount (255 PENGU)',
+    monthIntent.status === 200 && BigInt(monthData.amountWei) === pengu('255')
   )
   const lifetimeIntent = await fetch(`${BASE}/api/payments/intent`, {
     method: 'POST',
@@ -113,9 +113,9 @@ async function main() {
   })
   const lifetimeData = await lifetimeIntent.json()
   pass(
-    'lifetime intent with exact amount (1500 PENGU)',
+    'lifetime intent with exact amount (7650 PENGU)',
     lifetimeIntent.status === 200 &&
-      BigInt(lifetimeData.amountWei) === pengu('1500') &&
+      BigInt(lifetimeData.amountWei) === pengu('7650') &&
       lifetimeData.days === null
   )
   pass(
@@ -171,9 +171,25 @@ async function main() {
   const marketData = await market.json()
   pass('market overview public & live', market.status === 200 && marketData.priceUsd > 0)
 
-  const candles = await fetch(`${BASE}/api/market/candles?tf=4h`)
-  const candlesData = await candles.json()
-  pass('candles endpoint public', candles.status === 200 && candlesData.candles?.length > 50)
+  // Security check = "is it public?" (a 401/403 would fail). The GeckoTerminal
+  // upstream can transiently throttle and 502 with a cold cache — back off
+  // exponentially (the token bucket refills over ~60s) before judging, so
+  // availability flakiness ≠ security failure.
+  let candlesStatus = 0
+  let candlesLen = 0
+  for (let attempt = 0; attempt < 5 && candlesLen <= 50; attempt++) {
+    const candles = await fetch(`${BASE}/api/market/candles?tf=4h`)
+    const candlesData = await candles.json().catch(() => ({ candles: [] }))
+    candlesStatus = candles.status
+    candlesLen = candlesData.candles?.length ?? 0
+    if (candlesStatus === 401 || candlesStatus === 403) break
+    if (candlesLen <= 50) await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)))
+  }
+  pass(
+    'candles endpoint public',
+    candlesStatus !== 401 && candlesStatus !== 403 && candlesLen > 50,
+    `status=${candlesStatus} len=${candlesLen}`
+  )
 
   const history = await fetch(`${BASE}/api/signal/history`)
   const historyData = await history.json()

@@ -1,5 +1,23 @@
 # Deployment on Cloudflare (free tier, no credit card)
 
+> ## ⛔ DEPLOYMENT ON HOLD (owner decision — Round 17, 2026-08-28)
+>
+> **All deployment activity is intentionally paused.** Do NOT deploy this
+> application to any environment (Cloudflare or otherwise) until the owner
+> explicitly lifts this hold. Rationale:
+>
+> 1. A full audit pass (architecture / core / security / execution — see
+>    `docs/AUDIT.md`) was requested and is being finalized; findings and
+>    fixes must be reviewed first.
+> 2. The tariff was rebalanced (Round 17); owner wants the new ladder
+>    (10 / 65 / 255 / 2750 / 7650 PENGU) validated in the sandbox before
+>    any public exposure.
+> 3. No CI/CD pipeline exists, and none shall be added while on hold —
+>    nothing can deploy automatically.
+>
+> The steps below remain valid for when the hold is lifted. Treat them as
+> reference material, not an invitation.
+
 This app deploys cleanly to Cloudflare's **free Workers plan**. Two things need
 attention on Cloudflare vs. local dev: the database (SQLite doesn't exist on
 Workers) and build tooling. This guide covers both.
@@ -76,10 +94,10 @@ NEXT_PUBLIC_RPC_MAINNET=https://api.mainnet.abs.xyz
 NEXT_PUBLIC_PENGU_MAINNET=0x9ebe3a824ca958e4b3da772d2065518f009cba62
 NEXT_PUBLIC_TREASURY_ADDRESS=0x60Df4E186364c3a49A550Aee29Da1d5fe3658818
 SUBSCRIPTION_1D_PRICE_PENGU=10
-SUBSCRIPTION_7D_PRICE_PENGU=5
-SUBSCRIPTION_30D_PRICE_PENGU=30
-SUBSCRIPTION_365D_PRICE_PENGU=100
-SUBSCRIPTION_LIFETIME_PRICE_PENGU=1500
+SUBSCRIPTION_7D_PRICE_PENGU=65
+SUBSCRIPTION_30D_PRICE_PENGU=255
+SUBSCRIPTION_365D_PRICE_PENGU=2750
+SUBSCRIPTION_LIFETIME_PRICE_PENGU=7650
 GECKOTERMINAL_NETWORK=abstract
 GECKOTERMINAL_POOL=0xda7d037fda848177141e037f9d0c67cae7b53262
 SESSION_SECRET=<openssl rand -hex 32>   # use `wrangler secret put SESSION_SECRET` instead

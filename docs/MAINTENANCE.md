@@ -40,6 +40,12 @@ restart after changing. A price change only affects **new** intents — already
 credited subscriptions keep their remaining days, and lifetime holders keep
 lifetime.
 
+The Round-17 balance rule is enforced by `validateConfig()`: per-day rates must
+be non-increasing as plan duration grows (day 10 → week 65 → month 255 →
+year 2750 → lifetime 7650 PENGU) and no plan may exceed its linear base or the
+30% discount cap. A typo that breaks the ladder shows up as `configOk:false`
+on `/api/config` — check it after any price change.
+
 ### Rotate the treasury
 
 1. Set `NEXT_PUBLIC_TREASURY_ADDRESS` to the new address. Restart.

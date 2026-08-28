@@ -78,16 +78,21 @@ Registration and login (a wallet signature) are **free** — the free tier cover
 data, track record, backtest and risk calculator. Daily signals stay locked until an
 active plan exists:
 
-| Plan | Access | Default price (PENGU) |
-|---|---|---|
-| Free | registration + login; market data, track record, backtest, risk calculator | 0 |
-| `day` | 1 day | 10 |
-| `week` | 7 days | 5 |
-| `month` | 30 days | 30 |
-| `year` | 365 days | 100 |
-| `lifetime` | never expires | 1500 |
+| Plan | Access | Base (linear) | Discount | Default price (PENGU) | Per day |
+|---|---|---|---|---|---|
+| Free | registration + login; market data, track record, backtest, risk calculator | — | — | 0 | — |
+| `day` | 1 day | 10 | 0% | **10** | 10.00 |
+| `week` | 7 days | 70 | 7% | **65** | 9.29 |
+| `month` | 30 days | 300 | 15% | **255** | 8.50 |
+| `year` | 365 days | 3650 | 25% | **2750** | 7.53 |
+| `lifetime` | never expires | 10950 (3y) | 30% (cap) | **7650** | — |
 
-All prices are env-tunable (see [Configuration](#configuration)). The entitlement ladder is
+The ladder is a **staircase discount**: 1 day = 10 PENGU is the fixed baseline,
+and every longer plan gets a progressively larger discount off the linear base,
+hard-capped at 30% (`validateConfig()` enforces both monotonic per-day rates and
+the cap at boot — an env typo that unbalances the ladder surfaces as
+`configOk:false`). All prices are env-tunable (see
+[Configuration](#configuration)). The entitlement ladder is
 server-enforced and minimal — valid session → active subscription → granted — surfaced by
 the API as `auth_required` | `subscription_required` | `granted`. Finite plans stack (a new
 purchase extends the current expiry); `lifetime` stores a 2099-12-31 sentinel that never
@@ -128,11 +133,11 @@ Everything is environment-driven — **nothing is hardcoded**. See `.env.example
 | `NEXT_PUBLIC_PENGU_MAINNET` | `0x9ebe…cba62` | PENGU ERC-20 on Abstract mainnet |
 | `NEXT_PUBLIC_PENGU_TESTNET` | — | any test ERC-20 for testnet mode |
 | `NEXT_PUBLIC_TREASURY_ADDRESS` | `0x60Df…8818` | where all PENGU payments land |
-| `SUBSCRIPTION_1D_PRICE_PENGU` | `10` | day plan (1 day) |
-| `SUBSCRIPTION_7D_PRICE_PENGU` | `5` | week plan (7 days) |
-| `SUBSCRIPTION_30D_PRICE_PENGU` | `30` | month plan (30 days, most popular) |
-| `SUBSCRIPTION_365D_PRICE_PENGU` | `100` | year plan (365 days) |
-| `SUBSCRIPTION_LIFETIME_PRICE_PENGU` | `1500` | lifetime plan (never expires) |
+| `SUBSCRIPTION_1D_PRICE_PENGU` | `10` | day plan (1 day, baseline) |
+| `SUBSCRIPTION_7D_PRICE_PENGU` | `65` | week plan (7 days, 7% off base 70) |
+| `SUBSCRIPTION_30D_PRICE_PENGU` | `255` | month plan (30 days, 15% off base 300, most popular) |
+| `SUBSCRIPTION_365D_PRICE_PENGU` | `2750` | year plan (365 days, 25% off base 3650) |
+| `SUBSCRIPTION_LIFETIME_PRICE_PENGU` | `7650` | lifetime plan (30% off 3-year base 10950) |
 | `GECKOTERMINAL_NETWORK` / `GECKOTERMINAL_POOL` | `abstract` / PENGU-WETH pool | market data source |
 | `SESSION_SECRET` | — | **required**, ≥ 32 chars (`openssl rand -hex 32`) |
 
@@ -165,6 +170,11 @@ bun scripts/qa-freesession.ts                                      # logged in, 
 ```
 
 ## Deployment
+
+> **⛔ ON HOLD (Round 17):** deployment is intentionally paused pending owner
+> review of the audit pass and the rebalanced tariff. No CI/CD pipeline exists,
+> so nothing can deploy automatically. See the banner in
+> [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 Full guides live in [`docs/`](docs/):
 

@@ -128,7 +128,15 @@ export async function verifyPaymentTx(params: {
 
 /** Format PENGU units → wei string. */
 export function penguToWei(units: number): string {
-  return BigInt(Math.round(units * 10 ** PENGU_DECIMALS)).toString()
+  // EXACT integer conversion — required after audit finding A-1:
+  // `units * 10 ** 18` overflows Number.MAX_SAFE_INTEGER and silently loses
+  // precision (7650 → 7649.999…75712 PENGU in wei). Round-trip through a
+  // fixed-point string instead; 6 fractional digits is ample for prices.
+  const fixed = Math.abs(units).toFixed(6)
+  const [wholeStr, fracStr = '000000'] = fixed.split('.')
+  const fracScaled = (fracStr + '0'.repeat(PENGU_DECIMALS)).slice(0, PENGU_DECIMALS)
+  const wei = BigInt(wholeStr) * 10n ** BigInt(PENGU_DECIMALS) + BigInt(fracScaled)
+  return (units < 0 ? -wei : wei).toString()
 }
 
 /** Format wei string → PENGU units (display). */

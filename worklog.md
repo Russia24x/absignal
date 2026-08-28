@@ -621,3 +621,39 @@ Stage Summary:
 - Legacy data: old access-fee payers are NOT auto-migrated to the new tariff (sandbox-only data); accessGranted column kept for rollback safety.
 - .gitignore: +!.env.example exception (was swallowed by .env* rule).
 - Unresolved/next: funded-wallet live payment smoke (needs owner treasury+PENGU), Cloudflare deployment (docs ready), Telegram/email alerts, optional Session Keys reintroduction via the intent/verify seam.
+
+---
+Task ID: 17
+Agent: orchestrator (main)
+Task: Owner request (Persian) — rebalance the unbalanced tariff (1 day = 10 PENGU fixed; calculate the rest as a tiered/staircase discount capped at 30%), full code audit (architecture / core / security / execution), halt deployment, keep automated development running every 15 minutes.
+
+Work Log:
+- SESSION-START-SYNC-CHECK: HEAD f744447 (Round 16 v2 tariff), clean tree, dev server healthy (200s, live market data flowing).
+- TARIFF REBALANCE (Round-17 staircase rule):
+  • Owner fixed the baseline: 1 day = 10 PENGU. Designed the ladder off the linear base (10/day; lifetime basis = 3 years) with monotonically increasing discounts HARD-CAPPED at 30%:
+    day 10 (0%, 10.00/day) / week 65 (7% off 70, 9.29/day) / month 255 (15% off 300, 8.50/day) / year 2750 (25% off 3650, 7.53/day) / lifetime 7650 (30% cap off 10950)
+  • config.ts: new defaults; SubscriptionPackage gains `basePrice` + `discountPct` (computed live via discountOf() so env overrides keep badges truthful); validateConfig() now enforces the balance rule — monotonic per-day rates + no plan above base/30% cap (guards future env typos; surfaces as configOk:false).
+  • .env + .env.example updated; e2e-auth.ts exact-amount checks updated (month 255, lifetime 7650).
+  • Pricing UI: green "Save X%" badges on every discounted plan (lifetime gets "· MAX"), struck-through linear base price before the live price, NEW StaircaseLadder visual — 5 rising bars (height ∝ discount) with −pct labels, duration labels, 30%-cap dashed rule line; RTL-aware (bars rise in reading order). PlanGrid in signal-card gets compact −X% chips. i18n: +12 keys en+fa (savePct, maxBadge, ladder*, subtitle rewritten to explain the staircase).
+- FULL AUDIT (docs/AUDIT.md created — architecture/core/security/execution/deployment-halt + findings register):
+  • SECURITY AUDIT — 2 real defects found & fixed:
+    - A-1 (Medium, money math): penguToWei used `units * 10**18` which overflows Number.MAX_SAFE_INTEGER — the 7650 lifetime intent came out as 7649.999999999999475712 PENGU in wei (caught live by the updated e2e exact-amount check). Rewritten as exact BigInt fixed-point conversion (toFixed(6) string split). All 5 plans now produce exact wei.
+    - A-2 (Medium, concurrency): verify route had a check-then-act window — two concurrent verifies of the same intent could both pass the PENDING check and double-credit stacked days. Fixed with an ATOMIC CLAIM: updateMany({ id, status: PENDING, OR: [{txHash: null}, {txHash}] }) → loser gets 409; failed on-chain verification releases the claim; crash-retry with the same tx re-claims fine; P2002 unique-index violation → tx_already_used.
+  • Positive findings: all 14 API routes rate-limited; .env untracked (git-verified); secrets sweep clean; paywall ladder server-enforced with no payload leak; 6-layer on-chain payment verification; sessions are HMAC-signed, hash-stored, constant-time compared; single-use nonces with verbatim message storage.
+  • Execution audit: e2e 22/22 PASS (after fixes; hardened the flaky candles-availability check with exponential backoff — judges only 401/403 as security failure); lint clean; tsc src/scripts 0 errors; /api/config configOk:true with the new ladder.
+  • ARCHITECTURE audit: clean 4-layer split, single-source config, client never names a price (planId-only intents), i18n symmetric; noted non-blocking debt: in-memory market cache lost on restart (transient 502s under upstream throttle — self-heals).
+  • DEPLOYMENT HALT (owner decision): banner added at top of docs/DEPLOYMENT.md + README Deployment section; verified NO CI/CD pipelines, NO deploy configs, NO deploy scripts exist — nothing can deploy automatically. Lift conditions documented (owner review of audit + tariff acceptance).
+- QA (agent-browser):
+  • EN: prices 10/65/255/2,750/7,650 render with 4 strikethrough bases + Save 7/15/25/30% badges (+MAX on lifetime); per-day lines 10 / 9.29 / 8.5 / 7.53; "30% cap" label present.
+  • FA (default): RTL intact; VLM pricing review 9.5/10 ("production-ready, high-fidelity"); staircase VLM-verified — bars rise monotonically in RTL reading order, labels readable, cap line at the tallest bar's top.
+  • Mobile 390px: scrollWidth=390, pricing grid single-column, ZERO overflowing elements (DOM-verified deep scan); screenshot tooling quirk noted (agent-browser captures at 1280×800 regardless of CDP emulation — DOM checks used instead).
+  • Console: 0 errors after full interaction pass.
+- Docs: README (tariff table with Base/Discount/Per-day columns + staircase explanation + config-table prices + deployment-hold note), ARCHITECTURE.md (payments section: staircase + validateConfig guard), DEPLOYMENT.md (hold banner + env block), MAINTENANCE.md (pricing runbook: balance-rule enforcement), .env.example (annotated staircase).
+
+Stage Summary:
+- Tariff rebalanced exactly per owner spec: 1 day = 10 PENGU baseline; staircase 0/7/15/25/30% capped at 30% → 10/65/255/2750/7650 PENGU; boot-time validation makes imbalance impossible to miss.
+- Full audit delivered (docs/AUDIT.md): verdict PASS with 2 medium security fixes applied during the audit (wei precision loss A-1, concurrent double-credit race A-2) + 1 guard added (A-4 tariff validation). Findings register with severities.
+- Deployment HALTED with banners; verified nothing can auto-deploy.
+- All QA green: e2e 22/22, lint, tsc, EN+FA+mobile+console, VLM 9.5/10 pricing.
+- 15-minute automated development cycle (webDevReview cron) configured per owner instruction.
+- Unresolved/next-phase: funded-wallet live payment smoke (needs owner); deployment hold lift is owner's call; roadmap: Telegram/email alerts, optional Session Keys via the intent/verify seam.

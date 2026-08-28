@@ -16,6 +16,7 @@ import {
   Crown,
   Infinity as InfinityIcon,
   Lock,
+  TrendingDown,
   Zap,
   type LucideIcon,
 } from 'lucide-react'
@@ -33,9 +34,95 @@ const PLAN_ICONS: Record<string, LucideIcon> = {
   lifetime: InfinityIcon,
 }
 
+/** Hard cap of the Round-17 discount staircase (percent). */
+const DISCOUNT_CAP = 30
+
+/** Height (px) of the tallest bar in the staircase visual. */
+const LADDER_MAX_PX = 52
+
 /** Trim a per-day rate to a clean display string ("10", "0.71", "0.27"). */
 function rateLabel(rate: number): string {
   return rate.toFixed(2).replace(/\.?0+$/, '')
+}
+
+/** Short staircase label per plan id. */
+const LADDER_LABELS: Record<string, 'ladderDay' | 'ladderWeek' | 'ladderMonth' | 'ladderYear' | 'ladderLifetime'> = {
+  day: 'ladderDay',
+  week: 'ladderWeek',
+  month: 'ladderMonth',
+  year: 'ladderYear',
+  lifetime: 'ladderLifetime',
+}
+
+/** Discount staircase visual — 5 rising bars capped by the 30% dashed line. */
+function StaircaseLadder({
+  packages,
+}: {
+  packages: Array<{ id: string; discountPct: number }>
+}) {
+  const { t, fmt } = useI18n()
+  const discounted = packages.some((p) => p.discountPct > 0)
+  if (!discounted) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ duration: 0.45 }}
+      className="mt-6 max-w-2xl mx-auto"
+    >
+      <div className="glass rounded-2xl border border-border/60 px-4 sm:px-6 py-4">
+        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-muted-foreground">
+          <TrendingDown className="size-3.5 text-bull" aria-hidden />
+          {t.pricing.ladderTitle}
+        </div>
+        <div className="mt-4 flex items-end justify-center gap-3 sm:gap-6">
+          {packages.map((p) => {
+            const isCap = p.discountPct >= DISCOUNT_CAP
+            const height = 6 + (p.discountPct / DISCOUNT_CAP) * (LADDER_MAX_PX - 6)
+            return (
+              <div key={p.id} className="flex w-11 sm:w-14 flex-col items-center gap-1.5">
+                <span
+                  className={cn(
+                    'text-[10px] font-black tabular-nums leading-none',
+                    p.discountPct > 0 ? 'text-bull' : 'text-muted-foreground/70'
+                  )}
+                  dir="ltr"
+                >
+                  {p.discountPct > 0 ? `−${fmt(p.discountPct)}%` : `${fmt(0)}%`}
+                </span>
+                <div
+                  className={cn(
+                    'w-full rounded-t-md border border-b-0 transition-colors',
+                    isCap
+                      ? 'border-bull/50 bg-gradient-to-t from-bull/25 to-bull/60'
+                      : 'border-primary/40 bg-gradient-to-t from-primary/20 to-primary/55'
+                  )}
+                  style={{ height: `${height}px` }}
+                  role="img"
+                  aria-label={`${p.id}: ${p.discountPct}%`}
+                />
+                <span className="text-[9px] font-medium text-muted-foreground/80 whitespace-nowrap leading-none">
+                  {t.pricing[LADDER_LABELS[p.id] ?? 'ladderDay']}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+        {/* 30% cap rule — dashed line exactly at the tallest bar's top */}
+        <div className="mx-auto mt-2 max-w-[280px] sm:max-w-[360px]">
+          <div className="relative border-t border-dashed border-bull/40 pt-1">
+            <span
+              className="absolute -top-2 end-1 rounded-full border border-bull/30 bg-bull/10 px-1.5 py-px text-[9px] font-bold text-bull"
+            >
+              {t.pricing.ladderCap}
+            </span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
 }
 
 export function Pricing() {
@@ -177,11 +264,25 @@ export function Pricing() {
                       <div className="flex size-9 items-center justify-center rounded-xl bg-secondary/70 border border-border/60 text-primary">
                         <Icon className="size-4.5" />
                       </div>
-                      {popular && (
-                        <Badge className="bg-primary/20 text-primary border-primary/50 hover:bg-primary/20 font-bold glow-frost text-[10px] px-2">
-                          {t.sub.mostPopular}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {p.discountPct > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="border-bull/40 text-bull font-bold text-[10px] px-2 gap-1"
+                          >
+                            <TrendingDown className="size-3" aria-hidden />
+                            {tf(t.pricing.savePct, { pct: fmt(p.discountPct) })}
+                            {p.discountPct >= DISCOUNT_CAP && (
+                              <span className="text-bull/70">· {t.pricing.maxBadge}</span>
+                            )}
+                          </Badge>
+                        )}
+                        {popular && (
+                          <Badge className="bg-primary/20 text-primary border-primary/50 hover:bg-primary/20 font-bold glow-frost text-[10px] px-2">
+                            {t.sub.mostPopular}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <h3 className="font-bold text-base mt-2">{t.pricing[`${p.id}Title` as keyof typeof t.pricing] as string}</h3>
                     <p className="text-[11px] text-muted-foreground leading-snug">
@@ -189,7 +290,15 @@ export function Pricing() {
                     </p>
                   </CardHeader>
                   <CardContent className="pt-0 p-4 flex flex-col flex-1 gap-3">
-                    <div dir="ltr" className="flex items-baseline gap-1.5">
+                    <div dir="ltr" className="flex items-baseline gap-1.5 flex-wrap">
+                      {p.basePrice > p.price && (
+                        <span
+                          className="text-xs font-semibold text-muted-foreground/60 line-through tabular-nums"
+                          title={`${p.basePrice} PENGU`}
+                        >
+                          {fmt(p.basePrice)}
+                        </span>
+                      )}
                       <span className="text-2xl font-black tabular-nums text-gradient-frost">
                         {fmt(p.price)}
                       </span>
@@ -234,6 +343,9 @@ export function Pricing() {
             )
           })}
         </div>
+
+        {/* Staircase — the tiered-discount ladder, capped at 30% */}
+        <StaircaseLadder packages={packages} />
 
         <motion.p
           initial={{ opacity: 0 }}

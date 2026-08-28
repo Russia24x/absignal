@@ -46,11 +46,31 @@ export async function POST(req: Request) {
 
   // Prevent the same tx from being attached to two different intents
   // (unique index on txHash enforces it at the DB level too).
-  const txTaken = intent.txHash
-    ? null
-    : await db.paymentIntent.findFirst({ where: { txHash, NOT: { id: intent.id } } })
+  const txTaken = await db.paymentIntent.findFirst({ where: { txHash, NOT: { id: intent.id } } })
   if (txTaken) {
     return NextResponse.json({ error: 'tx_already_used' }, { status: 400 })
+  }
+
+  // Atomic claim (audit finding A-2): flip the intent's txHash from
+  // null → txHash in a single conditional write. Concurrent verify calls
+  // for the same intent can't both win, so the entitlement is credited
+  // exactly once. Re-claiming with the SAME hash (crash-retry) is allowed;
+  // a different hash loses the race and gets 409.
+  let claimed: { count: number }
+  try {
+    claimed = await db.paymentIntent.updateMany({
+      where: { id: intent.id, status: 'PENDING', OR: [{ txHash: null }, { txHash }] },
+      data: { txHash },
+    })
+  } catch (err) {
+    // Unique-index violation = another intent already owns this tx.
+    if ((err as { code?: string }).code === 'P2002') {
+      return NextResponse.json({ error: 'tx_already_used' }, { status: 400 })
+    }
+    throw err
+  }
+  if (claimed.count === 0) {
+    return NextResponse.json({ error: 'intent_not_claimable' }, { status: 409 })
   }
 
   const result = await verifyPaymentTx({
@@ -62,6 +82,10 @@ export async function POST(req: Request) {
   })
 
   if (!result.ok) {
+    // Release the claim so the user can retry with a valid tx.
+    await db.paymentIntent
+      .updateMany({ where: { id: intent.id, txHash }, data: { txHash: null } })
+      .catch(() => {})
     return NextResponse.json(
       { error: 'verification_failed', reason: result.reason },
       { status: 400 }
@@ -127,7 +151,6 @@ export async function POST(req: Request) {
     where: { id: intent.id },
     data: { status: 'PAID', txHash, creditedAt: new Date() },
   })
-
   return NextResponse.json({
     status: 'credited',
     type: intent.type,

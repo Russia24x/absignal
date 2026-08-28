@@ -17,7 +17,7 @@ export interface AppConfig {
   chain: { id: number; name: string; shortName: string; rpcUrl: string; blockExplorerUrl: string; blockExplorerTxPath: string }
   penguAddress: string | null
   treasuryAddress: string
-  packages: Array<{ id: string; days: number | null; label: string; price: number; popular?: boolean }>
+  packages: Array<{ id: string; days: number | null; label: string; price: number; basePrice: number; discountPct: number; popular?: boolean }>
   dataSource: { provider: string; network: string; pool: string }
   configOk: boolean
   configErrors: string[]
