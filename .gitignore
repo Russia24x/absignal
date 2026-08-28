@@ -67,3 +67,4 @@ Caddyfile
 /mini-services/
 /tests/
 agent-ctx/tool-results/
+tool-results/
