@@ -3,7 +3,7 @@
 /**
  * PenguSignal — single-page application.
  * Sections: hero → live terminal (market + signal) → track record →
- * backtest → features → pricing → holder perks → FAQ.
+ * backtest → risk tools → features → pricing → FAQ.
  * Footer sticks to the viewport bottom.
  */
 
@@ -17,11 +17,9 @@ import { BacktestSandbox } from '@/components/landing/backtest'
 import { RiskCalculator } from '@/components/landing/risk-calculator'
 import { Features } from '@/components/landing/features'
 import { Pricing } from '@/components/landing/pricing'
-import { HolderPerks } from '@/components/landing/holder-perks'
 import { Faq } from '@/components/landing/faq'
 import { CtaBanner } from '@/components/landing/cta-banner'
 import { Footer } from '@/components/landing/footer'
-import { Snowfall } from '@/components/landing/snowfall'
 import { BackToTop } from '@/components/landing/back-to-top'
 import { MarketOverviewCards } from '@/components/market/overview-cards'
 import { PriceChart } from '@/components/market/price-chart'
@@ -36,7 +34,6 @@ export default function Home() {
 
   return (
     <div dir={dir} className="relative min-h-screen flex flex-col">
-      <Snowfall count={20} />
       <ScrollProgressBar />
       <LivePriceTicker />
       <Header />
@@ -83,7 +80,6 @@ export default function Home() {
         <RiskCalculator />
         <Features />
         <Pricing />
-        <HolderPerks />
         <Faq />
         <CtaBanner />
       </main>

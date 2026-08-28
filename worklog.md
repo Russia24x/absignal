@@ -767,3 +767,25 @@ Stage Summary:
 - New capability: Portal upvote banner (free growth channel) activates automatically once the app is listed and NEXT_PUBLIC_ABSTRACT_APP_ID is set.
 - All gates green: 22/22 e2e, tsc/lint clean, console clean, mobile clean, VLM positive.
 - Remaining for the OWNER: list the app on the Abstract Portal and set the app id; optionally deploy+fund the General paymaster and set NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS for 0-gas payments; fund treasury; then DEPLOYMENT.md go-live steps. Live funded-wallet smoke test still pending (sandbox cannot reach privy.abs.xyz).
+
+---
+Task ID: 22
+Agent: orchestrator (main)
+Task: Owner request (Persian) — review all button functionality; make purchasing simple, easy and with correct tariffs; remove demo/showcase sections that have no utility or no connection to reality/backend.
+
+Work Log:
+- FULL-SECTION AUDIT: read every landing/market/signal component and its i18n copy, classifying each section as (a) real-data + backend-wired, (b) functional client tool, or (c) show-only / fake-claim. Result: PriceAlerts (localStorage + live price + toast/notification) = REAL; RiskCalculator (live-price math tool) = REAL; Backtest (real historical replay, honestly labeled) = REAL; Features copy (SIWE, 8 indicators, locked verdicts, on-chain payments, real data, i18n) = ALL TRUE; **HolderPerks = FAKE** (4 perks described as shipped/promised roadmap: holder discounts, treasury rebates, mid-day alpha, "verified live against your wallet PENGU balance" tooltip — none implemented anywhere, no holder-threshold check exists in backend); Snowfall = pure decoration, zero utility.
+- REMOVED HolderPerks section: deleted src/components/landing/holder-perks.tsx, removed from page.tsx, removed holderPerks i18n block (EN+FA ~40 keys) and eyebrow.holderPerks from dict.ts. Verified zero leftover references (rg perk/holder/rebate/roadmap = clean; no #perks anchors remain).
+- REMOVED Snowfall: deleted src/components/landing/snowfall.tsx, removed from page.tsx, deleted .snowflake/.snow-fall CSS from globals.css.
+- DIRECT PURCHASE FROM PRICING (the "خرید ساده و راحت" fix): previously all 5 plan CTAs were dead-end anchors to #app. Now pricing.tsx uses useSession: when user is signed-in AND wallet connected → each card renders the real PayButton (label "Pay {price} PENGU" / "پرداخت {price} پنگو") which opens the payment dialog DIRECTLY (intent → optimistic wallet transfer → on-chain verify); lifetime owners instead see a green "Owned — active" state; everyone else keeps the #app anchor into the connect→sign→subscribe ladder. New i18n keys: pricing.ctaPay + pricing.owned (EN+FA).
+- TARIFF VERIFICATION: /api/config → cards render 10 / 65 / 255 / 2,750 / 7,650 PENGU (verified in DOM, EN + FA digits ۱۰/۶۵/۲۵۵/۲٬۷۵۰/۷٬۶۵۰). Intent API resolves amounts server-side from the same config (never trusts client) — 22/22 e2e suite re-verified incl. "intent requires session", "fake tx rejected", "treasury targeting".
+- SESSION-STATE E2E: crafted a real signed session cookie (HMAC via app's own SESSION_SECRET) → /api/auth/me returns user; pricing correctly keeps anchor CTAs when wallet not connected (can't pay without wallet — correct gating); cleaned up the test user/session afterwards.
+- BROWSER QA (agent-browser): sections now top/app/track/backtest/risk/features/pricing/faq (no perks, 0 snowflake nodes) · price-alert add via input + quick chip works (2 rows persisted) · chart TF tab switch to 4h renders · lang toggle EN↔FA full RTL with Persian prices/CTA · FAQ accordion expands + search "پرداخت" filters to 4 items · backtest table renders real replay rows · back-to-top scrolls to y≈8 · mobile 390px scrollWidth=390 (no overflow), mobile menu opens, footer present · hero Connect button triggers AGW without page crash (Privy backend sandbox-blocked — env limitation, not code) · console: 0 errors, 0 page-errors.
+- VLM review of final pricing (7.5/10): confirmed 5 plan cards + free tier and correct prices; minor nitpicks already covered by grid items-stretch/h-full/flex-1 (DOM-verified equal heights).
+- GATES: tsc 0 errors · lint clean · e2e-auth 22/22 · dev.log clean.
+- Git: committed & pushed to github.com/Russia24x/absignal.
+
+Stage Summary:
+- Every remaining section is now either real-data (market, signals, track record, backtest, sentiment), a genuinely functional tool (alerts, risk calculator), honest marketing (features/FAQ), or the purchase flow itself. The only fake-claim section (HolderPerks) and the decorative Snowfall are gone.
+- Purchase is now one click from the Pricing section for signed-in users (PayButton directly on each card, correct 10/65/255/2750/7650 PENGU tariffs, "Owned" state for lifetime holders), and the ladder path for new visitors is unchanged.
+- All gates green. Remaining known limitations are environmental only (sandbox blocks privy.abs.xyz so a live funded-wallet payment smoke test still must happen from a real network; owner must fund treasury).

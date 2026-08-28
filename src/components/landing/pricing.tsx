@@ -5,6 +5,11 @@
  * (day / week / month / year / lifetime).
  * Prices render from live /api/config — never hardcoded.
  * No session keys: plain ERC-20 transfers verified on-chain.
+ *
+ * Buy path: when the visitor is signed in with a connected wallet, each
+ * plan's CTA opens the payment dialog DIRECTLY (PayButton → intent →
+ * wallet transfer → on-chain verify). Otherwise it points to the live
+ * terminal, where the connect → sign → subscribe ladder lives.
  */
 
 import { motion } from 'framer-motion'
@@ -12,6 +17,7 @@ import {
   CalendarCheck,
   CalendarDays,
   Check,
+  CheckCheck,
   Compass,
   Crown,
   Infinity as InfinityIcon,
@@ -23,7 +29,8 @@ import {
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useI18n } from '@/lib/i18n/context'
-import { useAppConfig } from '@/hooks/use-app-data'
+import { useAppConfig, useSession } from '@/hooks/use-app-data'
+import { PayButton, type PayPlanId } from '@/components/payments/payment-flow'
 import { cn } from '@/lib/utils'
 
 const PLAN_ICONS: Record<string, LucideIcon> = {
@@ -129,6 +136,12 @@ export function Pricing() {
   const { t, tf, fmt } = useI18n()
   const { data: config } = useAppConfig()
   const packages = config?.packages ?? []
+
+  // Direct-purchase eligibility: a signed-in user with their wallet
+  // connected can pay straight from the pricing cards.
+  const { data: session } = useSession()
+  const canBuy = !!session?.user && !!session.isConnected
+  const isLifetimeOwner = !!session?.user?.isLifetime
 
   const freeChips = [
     t.pricing.freeChipMarket,
@@ -325,18 +338,44 @@ export function Pricing() {
                         </li>
                       ))}
                     </ul>
-                    <a href="#app" className="block">
-                      <span
-                        className={cn(
-                          'block w-full text-center rounded-xl px-3 py-2.5 text-xs font-bold transition-all',
-                          popular
-                            ? 'bg-primary text-primary-foreground hover:bg-primary/90 glow-frost'
-                            : 'bg-secondary/80 border border-primary/25 text-foreground hover:border-primary/60 hover:text-primary'
-                        )}
-                      >
-                        {t.pricing.cta}
-                      </span>
-                    </a>
+                    {/* CTA — direct purchase when signed in, ladder otherwise */}
+                    {canBuy ? (
+                      isLifetimeOwner ? (
+                        <span
+                          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-bull/40 bg-bull/10 px-3 py-2.5 text-xs font-bold text-bull"
+                        >
+                          <CheckCheck className="size-3.5" strokeWidth={2.5} />
+                          {t.pricing.owned}
+                        </span>
+                      ) : (
+                        <PayButton
+                          planId={p.id as PayPlanId}
+                          variant={popular ? 'default' : 'outline'}
+                          size="default"
+                          className={cn(
+                            'h-auto w-full rounded-xl px-3 py-2.5 text-xs font-bold',
+                            popular
+                              ? 'glow-frost'
+                              : 'border-primary/25 bg-secondary/80 text-foreground hover:border-primary/60 hover:bg-secondary/80 hover:text-primary'
+                          )}
+                        >
+                          {tf(t.pricing.ctaPay, { price: fmt(p.price) })}
+                        </PayButton>
+                      )
+                    ) : (
+                      <a href="#app" className="block">
+                        <span
+                          className={cn(
+                            'block w-full text-center rounded-xl px-3 py-2.5 text-xs font-bold transition-all',
+                            popular
+                              ? 'bg-primary text-primary-foreground hover:bg-primary/90 glow-frost'
+                              : 'bg-secondary/80 border border-primary/25 text-foreground hover:border-primary/60 hover:text-primary'
+                          )}
+                        >
+                          {t.pricing.cta}
+                        </span>
+                      </a>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>

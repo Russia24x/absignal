@@ -449,6 +449,8 @@ export const dict = {
       featBestRate: 'Lowest per-day rate',
       featForever: 'Every future signal & feature included',
       cta: 'Start now',
+      ctaPay: 'Pay {price} PENGU',
+      owned: 'Owned — active',
       note: 'Direct PENGU transfers to the project treasury — verified on-chain. No session keys, no auto-renewals, no hidden charges.',
     },
 
@@ -558,30 +560,7 @@ export const dict = {
       features: 'Why PenguSignal',
       pricing: 'Pricing',
       faq: 'Answers',
-      holderPerks: 'For PENGU holders',
       risk: 'Risk tools',
-    },
-
-    // Holder Perks — landing section between Pricing and FAQ
-    holderPerks: {
-      title: 'Hold more PENGU, unlock more signal',
-      subtitle:
-        'The treasury grows with the community. Anyone holding PENGU in their connected wallet gets layered benefits on top of the standard plans — no extra cost, no lockup, fully on-chain verifiable.',
-      badgeLabel: 'Holder perk',
-      ctaTitle: 'Already holding?',
-      ctaDesc: 'Connect your wallet — perks activate automatically when your PENGU balance is detected.',
-      ctaButton: 'Connect & check',
-      perk1Title: 'Free daily preview',
-      perk1Desc: 'Holders see a free high-level verdict (BUY / HOLD / SELL) every day before unlocking the full report with a plan.',
-      perk2Title: 'Plan discounts',
-      perk2Desc: 'Preferential pricing on every plan for wallets holding PENGU above the holder threshold (shipping with holder verification — roadmap).',
-      perk3Title: 'Members-only alpha',
-      perk3Desc: 'Mid-day re-evaluation when the 4h trend flips. Holders get an alert-style update before the next daily lock.',
-      perk4Title: 'Treasury rebates',
-      perk4Desc: 'A share of every paid signal flows back to long-term holders via seasonal on-chain distributions (roadmap).',
-      thresholdLabel: 'Holder threshold',
-      thresholdValue: '1,000 PENGU',
-      tooltipText: 'Verified live against your wallet PENGU balance on Abstract.',
     },
 
     // Common
@@ -1056,6 +1035,8 @@ export const dict = {
       featBestRate: 'کمترین نرخ روزانه',
       featForever: 'همه سیگنال‌ها و قابلیت‌های آینده شامل می‌شود',
       cta: 'همین حالا شروع کن',
+      ctaPay: 'پرداخت {price} پنگو',
+      owned: 'فعال — مال شما',
       note: 'تراف مستقیم PENGU به کیف خزانه پروژه — تأیید on-chain. بدون Session Key، بدون تمدید خودکار، بدون هزینه پنهان.',
     },
 
@@ -1163,30 +1144,7 @@ export const dict = {
       features: 'چرا پنگوسیگنال',
       pricing: 'تعرفه',
       faq: 'پاسخ‌ها',
-      holderPerks: 'برای دارندگان پنگو',
       risk: 'ابزار ریسک',
-    },
-
-    // مزایای دارندگان پنگو — بخش بین تعرفه و سؤالات متداول
-    holderPerks: {
-      title: 'پنگوی بیشتر نگه‌دار، سیگنال بیشتر بگیر',
-      subtitle:
-        'خزانه پروژه با جامعه رشد می‌کند. هر کس که پنگو در کیف پول وصل‌شده‌اش داشته باشد، مزایای لایه‌لایه روی پلن‌های استاندارد دریافت می‌کند — بدون هزینه اضافه، بدون قفل، کاملاً قابل ممیزی روی زنجیره.',
-      badgeLabel: 'مزیت دارنده',
-      ctaTitle: 'از قبل پنگو دارید؟',
-      ctaDesc: 'کیف پول را وصل کنید — با تشخیص موجودی پنگوی شما، مزایا به‌صورت خودکار فعال می‌شوند.',
-      ctaButton: 'اتصال و بررسی',
-      perk1Title: 'پیش‌نمایش روزانه رایگان',
-      perk1Desc: 'دارندگان هر روز قبل از باز کردن گزارش کامل با پلن، یک رأی سطح‌بالا (خرید / نگه‌داری / فروش) به‌صورت رایگان می‌بینند.',
-      perk2Title: 'تخفیف پلن‌ها',
-      perk2Desc: 'قیمت ویژه روی همه پلن‌ها برای کیف پول‌هایی که پنگوی بالای آستانه دارنده دارند (همراه تأیید دارنده — نقشه‌راه).',
-      perk3Title: 'آلفای اعضای ویژه',
-      perk3Desc: 'ارزیابی مجدد وسط روز وقتی روند ۴ساعته برگردد. دارندگان قبل از قفل روز بعد، یک هشدار به‌روزرسانی دریافت می‌کنند.',
-      perk4Title: 'تخفیف‌های خزانه',
-      perk4Desc: 'سهمی از هر سیگنال پولی به دارندگان بلندمدت از طریق توزیع‌های فصلی روی زنجیره برمی‌گردد (نقشه‌راه).',
-      thresholdLabel: 'آستانه دارنده',
-      thresholdValue: '۱٬۰۰۰ پنگو',
-      tooltipText: 'به‌صورت زنده در برابر موجودی پنگوی کیف پول شما روی Abstract بررسی می‌شود.',
     },
 
     common: {

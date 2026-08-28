@@ -439,22 +439,6 @@
   80%, 100% { transform: scale(2.2); opacity: 0; }
 }
 
-@keyframes snow-fall {
-  0% { transform: translate3d(0, -10px, 0) rotate(0deg); opacity: 0; }
-  10% { opacity: 0.8; }
-  100% { transform: translate3d(var(--snow-x, 20px), 105vh, 0) rotate(360deg); opacity: 0; }
-}
-
-.snowflake {
-  position: fixed;
-  top: -10px;
-  color: rgba(200, 235, 255, 0.55);
-  pointer-events: none;
-  z-index: 5;
-  animation: snow-fall linear infinite;
-  user-select: none;
-}
-
 /* Lightweight-charts container fix for RTL pages */
 .chart-ltr {
   direction: ltr;
