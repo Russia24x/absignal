@@ -365,6 +365,7 @@ export function BacktestSandbox() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="max-h-96 overflow-y-auto nice-scroll">
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="sticky top-0 bg-background/95 backdrop-blur">
                       <TableRow>
@@ -424,6 +425,7 @@ export function BacktestSandbox() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -183,8 +183,8 @@ export function MarketOverviewCards() {
       </div>
 
       {/* Buy pressure + meta */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-3 min-w-48 flex-1 max-w-xs">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3 min-w-40 flex-1 max-w-xs">
           <span className="whitespace-nowrap">{t.market.buyPressure}</span>
           {buyRatio != null ? (
             <>
@@ -195,7 +195,7 @@ export function MarketOverviewCards() {
             <span>—</span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {market.stale && (
             <Badge variant="outline" className="border-amber-400/40 text-amber-300 text-[10px]">
               {t.market.staleData}
@@ -206,7 +206,7 @@ export function MarketOverviewCards() {
               {t.market.pool}: <span className="text-foreground/80">{market.poolName ?? config.dataSource.pool}</span>
             </span>
           )}
-          <span>
+          <span className="whitespace-nowrap">
             {t.market.updated}: {fmt(secondsAgo)} {t.market.updatedSecondsAgo}
           </span>
         </div>

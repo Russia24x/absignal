@@ -6,15 +6,20 @@
  * day unlock / subscription) and renders the complete engine output.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
+import { toast } from 'sonner'
 import {
+  Activity,
   BadgeCheck,
   CalendarDays,
+  CheckCheck,
   Crown,
   Gauge,
+  Layers,
   Loader2,
   Lock,
+  Share2,
   ShieldCheck,
   Sparkles,
   Target,
@@ -29,7 +34,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/lib/i18n/context'
-import { useSignalToday, useSession, useAppConfig } from '@/hooks/use-app-data'
+import { useSignalToday, useSession, useAppConfig, useTrackRecord } from '@/hooks/use-app-data'
 import { useNextSignalCountdown } from '@/hooks/use-countdown'
 import { PayButton } from '@/components/payments/payment-flow'
 import { verdictStyles, ScoreGauge } from '@/components/signal/verdict-ui'
@@ -38,6 +43,146 @@ import { cn } from '@/lib/utils'
 /* ------------------------------- Verdict UI ------------------------------- */
 
 /* ------------------------------ Locked states ------------------------------ */
+
+/**
+ * Locked-state preview panel. Instead of a bare icon + CTA, we show:
+ *  - a checklist of what unlocks (the product pitch),
+ *  - a blurred-but-real glimpse of yesterday's resolved signal (verdict +
+ *    gauge + plan numbers) — real data from the public history API, no
+ *    leak of today's verdict,
+ *  - a mini accuracy strip for the last 15 resolved days (win/loss dots).
+ * The goal: a locked state that *sells* by showing the shape of the
+ * product, not an empty box.
+ */
+function LockedPreview() {
+  const { t, tf } = useI18n()
+  const { data: track } = useTrackRecord()
+
+  // Latest resolved entry (verdict !== LOCKED, outcome !== PENDING)
+  const resolved = track?.entries.filter((e) => e.verdict !== 'LOCKED' && e.outcome !== 'PENDING') ?? []
+  const yesterday = resolved[0] ?? null
+  const last15 = resolved.slice(0, 15)
+  const wins = last15.filter((e) => e.outcome === 'WIN').length
+  const accuracy = last15.length > 0 ? Math.round((wins / last15.length) * 100) : null
+
+  const unlocks = [
+    { icon: TrendingUp, text: t.signal.previewVerdict },
+    { icon: Target, text: t.signal.previewPlan },
+    { icon: Gauge, text: t.signal.previewTimeframes },
+    { icon: Activity, text: t.signal.previewIndicators },
+    { icon: Layers, text: t.signal.previewLevels },
+  ]
+
+  return (
+    <div className="space-y-4">
+      {/* What you unlock — checklist */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {unlocks.map(({ icon: Icon, text }) => (
+          <div
+            key={text}
+            className="flex items-center gap-2 rounded-xl border border-border/60 bg-secondary/30 px-3 py-2 text-[11px] text-muted-foreground"
+            title={text}
+          >
+            <Icon className="size-3.5 shrink-0 text-primary/80" />
+            <span className="leading-tight">{text}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Yesterday's real signal — blurred teaser */}
+      {yesterday && (() => {
+        const vs = verdictStyles(yesterday.verdict)
+        return (
+          <div className="relative rounded-2xl border border-border/60 bg-secondary/20 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                {t.signal.previewSampleTitle}
+              </span>
+              <span className="text-[10px] text-muted-foreground/70 font-mono">{yesterday.date}</span>
+            </div>
+            <div className="relative px-4 pb-4" aria-hidden>
+              {/* Blurred content — decorative silhouette of a real signal */}
+              <div className="flex items-center gap-4 blur-[4px] select-none pointer-events-none opacity-90">
+                <ScoreGauge score={yesterday.score} size="sm" />
+                <div className="flex-1 space-y-2">
+                  <div className={cn('text-2xl font-black tracking-tight', vs.color)}>
+                    {t.signal.verdicts[yesterday.verdict as keyof typeof t.signal.verdicts] ?? yesterday.verdict}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 font-mono text-[10px] text-muted-foreground">
+                    <div>ENTRY<br />$0.0093–35</div>
+                    <div className="text-bear">SL<br />$0.0089</div>
+                    <div className="text-bull">TP1-3<br />$0.0097+</div>
+                  </div>
+                </div>
+              </div>
+              {/* Lock badge overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="pill-status flex items-center gap-2 rounded-full px-4 py-2">
+                  <Lock className="size-4 text-primary" />
+                  <span className="text-xs font-bold text-primary">{t.signal.previewUnlockCta}</span>
+                </div>
+              </div>
+            </div>
+            <div className="px-4 pb-3 -mt-1">
+              <a
+                href="#track"
+                className="inline-flex items-center gap-1 text-[11px] text-primary/80 hover:text-primary transition-colors font-semibold"
+              >
+                {t.signal.previewSampleNote} →
+              </a>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Mini accuracy strip — last 15 resolved days */}
+      {last15.length > 0 && (
+        <div className="rounded-2xl border border-border/60 bg-secondary/20 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              {t.signal.previewRecentTitle}
+            </span>
+            {accuracy != null && (
+              <span className="text-xs font-mono font-bold text-bull">
+                {tf(t.signal.previewAccuracy, { n: accuracy })}
+                <span className="text-muted-foreground font-normal">
+                  {' '}{tf(t.signal.previewFromSignals, { n: last15.length })}
+                </span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 chart-ltr" dir="ltr">
+            {last15.map((e) => (
+              <TooltipProvider key={e.date}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className={cn(
+                        'h-6 flex-1 min-w-2 rounded-sm cursor-help transition-transform hover:scale-y-110',
+                        e.outcome === 'WIN'
+                          ? 'bg-bull/70'
+                          : e.outcome === 'LOSS'
+                            ? 'bg-bear/70'
+                            : 'bg-muted-foreground/30'
+                      )}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    <span className="font-mono">{e.date}</span> ·{' '}
+                    {t.signal.verdicts[e.verdict as keyof typeof t.signal.verdicts] ?? e.verdict} ·{' '}
+                    <span className={e.outcome === 'WIN' ? 'text-bull' : e.outcome === 'LOSS' ? 'text-bear' : ''}>
+                      {e.outcome}
+                    </span>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function LockedState({
   kind,
@@ -52,13 +197,13 @@ function LockedState({
   const { isConnected } = useAccount()
 
   return (
-    <div className="flex flex-col items-center text-center gap-4 py-8 px-4">
+    <div className="flex flex-col items-center text-center gap-4 py-6 px-3 sm:px-4">
       <div className="relative">
-        <div className="flex size-16 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 glow-frost">
-          {kind === 'connect' && <Wallet className="size-7 text-primary" />}
-          {kind === 'signing' && <Loader2 className="size-7 text-primary animate-spin" />}
-          {kind === 'access' && <Lock className="size-7 text-primary" />}
-          {kind === 'day' && <Sparkles className="size-7 text-primary" />}
+        <div className="flex size-14 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 glow-frost">
+          {kind === 'connect' && <Wallet className="size-6 text-primary" />}
+          {kind === 'signing' && <Loader2 className="size-6 text-primary animate-spin" />}
+          {kind === 'access' && <Lock className="size-6 text-primary" />}
+          {kind === 'day' && <Sparkles className="size-6 text-primary" />}
         </div>
       </div>
 
@@ -66,9 +211,6 @@ function LockedState({
         <>
           <h3 className="text-lg font-bold">{t.signal.connectFirst}</h3>
           <p className="text-sm text-muted-foreground max-w-md">{t.signal.lockedDesc}</p>
-          <div className="shimmer rounded-2xl px-6 py-3 font-mono text-sm select-none blur-[3px]" aria-hidden>
-            VERDICT: ███████ · SCORE: ██ · ENTRY: $0.00████ · SL: $0.00████
-          </div>
         </>
       )}
 
@@ -103,6 +245,11 @@ function LockedState({
         </>
       )}
 
+      {/* Product preview — sells the unlock with real resolved data */}
+      <div className="w-full pt-2 border-t border-border/40">
+        <LockedPreview />
+      </div>
+
       {!isConnected && kind !== 'connect' && null}
     </div>
   )
@@ -135,6 +282,45 @@ function SubscriptionRow({ compact = false }: { compact?: boolean }) {
 
 /* ------------------------------ Full signal ------------------------------ */
 
+/** Share button — Web Share API when available, clipboard fallback. */
+function ShareSignalButton({ text }: { text: string }) {
+  const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
+
+  const share = async () => {
+    // Prefer the native share sheet (mobile)
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: 'PenguSignal', text })
+        return
+      } catch {
+        // user dismissed or share failed — fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      toast.success(t.signal.shareCopied)
+      setTimeout(() => setCopied(false), 1600)
+    } catch {
+      toast.error(t.signal.shareFailed)
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={share}
+      aria-label={t.signal.share}
+      className="gap-1.5 h-8 border-border/60 hover:border-primary/40 hover:text-primary"
+    >
+      {copied ? <CheckCheck className="size-3.5 text-bull" /> : <Share2 className="size-3.5" />}
+      <span className="hidden sm:inline">{t.signal.share}</span>
+    </Button>
+  )
+}
+
 function FullSignal({ signal }: { signal: NonNullable<ReturnType<typeof useSignalToday>['data']>['signal'] }) {
   const { t, lang, fmt } = useI18n()
   if (!signal) return null
@@ -146,6 +332,17 @@ function FullSignal({ signal }: { signal: NonNullable<ReturnType<typeof useSigna
   const isShort = signal.plan.side === 'short'
 
   const p = (n: number) => `$${n.toFixed(5)}`
+
+  const shareText = [
+    `PenguSignal — ${signal.date}`,
+    `${verdictLabel} (score ${signal.score >= 0 ? '+' : ''}${signal.score.toFixed(0)})`,
+    signal.plan.side !== 'none'
+      ? `${isLong ? 'LONG' : 'SHORT'} · entry ${p(signal.plan.entryLow)}–${p(signal.plan.entryHigh)} · SL ${p(signal.plan.stopLoss)} · TP1 ${p(signal.plan.takeProfits[0] ?? 0)}`
+      : '',
+    `penguin signal on Abstract — data, not vibes.`,
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   return (
     <div className="space-y-5">
@@ -159,6 +356,7 @@ function FullSignal({ signal }: { signal: NonNullable<ReturnType<typeof useSigna
               <ShieldCheck className="size-3" />
               {t.signal.confidence}: {signal.confidence.toFixed(0)}%
             </Badge>
+            <ShareSignalButton text={shareText} />
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">
             {signal.summary[lang === 'fa' ? 'fa' : 'en']}

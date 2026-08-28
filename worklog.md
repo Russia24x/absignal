@@ -433,3 +433,52 @@ Stage Summary:
 - New utilities added to globals.css: `.btn-aurora-halo`, `.scroll-progress`, `.pill-status`, `.stat-tile`, `.stat-bar-track`
 - All QA green: EN+FA+mobile+lint+tsc+VLM 8.5-9/10
 - Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) optional roadmap: Telegram/email alerts, session keys; 4) the previously-reported AGW `loadProviderDetails` `Failed to fetch` error is environment-specific (Preview Panel sandbox), not blocking core flows — the app gracefully renders without a wallet provider and all paid-feature gates still display correctly
+
+---
+Task ID: 13
+Agent: Main Agent (Z.ai Code)
+Task: Round 13 (cron review cycle) — status assessment + agent-browser QA, VLM-driven improvements: 3 new features (Locked-signal preview panel, Chart Compare mode, Share Signal button) + 2 mobile overflow bug fixes
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: local == remote == 21d06d9, clean → proceeded
+- STATUS ASSESSMENT (agent-browser): page loads clean, 0 console errors, 8 sections, 21 chart canvases all render, FAQ search + scroll progress + stats strip from Round 12 all intact. Dev server had been killed by sandbox reaper mid-round (same as rounds 9/11) — restarted detached, recovered cleanly.
+- VLM review of Live Terminal section: 7/10. Weakest component identified: the locked "Today's Signal" card — "dominated by a large generic icon and a CTA wall rather than actual data; creates a gated feeling that disrupts the flow". → This round's focus: make the locked state SELL.
+- NEW FEATURE 1 — Locked-signal preview panel (signal-card.tsx, LockedPreview component):
+  • Replaces the old "shimmer VERDICT: ███ placeholder" with a 3-part conversion panel:
+    (1) "What you unlock" checklist — 5 pills with icons (verdict+score, entry/SL/3TP, 4-TF breakdown, 8 indicators, S/R levels), grid-cols-2 → sm:grid-cols-3, title attr for full text on hover
+    (2) "Yesterday's real signal" teaser — a blurred (blur-[4px], opacity-90) silhouette of the latest RESOLVED signal from the public track-record API: real ScoreGauge (real score), real verdict label, fake-but-representative plan numbers, behind a centered pill-status lock badge ("Unlock to see today's"). Link below: "Fully resolved — open it in Track Record →". NO leak: today's verdict never leaves the server; teaser uses only PAST resolved data (public by design)
+    (3) "Engine accuracy (last 15 days)" strip — win/loss/neutral mini bars (flex-1, hover:scale-y-110) with per-day tooltips (date · verdict · outcome) + accuracy % + resolved count
+  • All locked states (connect/signing/access/day) now show the preview below the CTA, separated by a hairline border-t
+  • VLM conversion-power review: 8/10 — "Social proof via transparency… FOMO… Honesty as a hook: 27% accuracy converts better than fake 99% claims"
+- NEW FEATURE 2 — Chart Compare mode (price-chart.tsx):
+  • New amber toggle pill "Compare 1d" (GitCompare icon) in the EMA legend row
+  • When active: dashed amber LineSeries overlays the chart — the NORMALIZED (0-based %) close of the complementary timeframe (1d ↔ 4h when main is 1d), on a hidden own price scale, clipped to the main chart's time window. Lets users see intraday structure AND the bigger daily picture on one canvas
+  • Toggle is aria-pressed; auto-adapts when the main tf changes ("Compare 4h" when main = 1d); fetches via the cached useCandles hook (no new endpoint)
+  • Renamed i18n destructure t→tr / tf→tfn in PriceChart to avoid collision with the tf state var (caught by AgwBoundary during hot-reload — error boundary worked exactly as designed)
+  • VLM: dashed amber line + active pill confirmed, 9/10
+- NEW FEATURE 3 — Share Signal button (signal-card.tsx, ShareSignalButton):
+  • In the FullSignal verdict hero (unlocked users only): outline button with Share2 icon
+  • Web Share API when available (mobile native share sheet) → clipboard fallback with sonner toast ("Signal copied to clipboard")
+  • Share text: date, verdict + score, LONG/SHORT + entry zone + SL + TP1, tagline — plain text, ready for Telegram/Twitter
+  • CheckCheck icon swap on success
+- BUG FIX 1 — Mobile horizontal overflow in Live Terminal (overview-cards.tsx):
+  • QA at 390px found scrollWidth > 390: the "Buy pressure + meta" row used min-w-48 (192px) + non-wrapping right cluster → exceeded viewport
+  • Fix: min-w-40, gap-x-3 gap-y-2 wrapping on both clusters, whitespace-nowrap on the Updated text; verified scrollWidth = 390 after fix
+- BUG FIX 2 — Backtest trades table mobile overflow (backtest.tsx):
+  • Table (right:409px at 390 viewport) now wrapped in overflow-x-auto container → scrolls horizontally instead of breaking layout
+- STYLING DETAIL: checklist pills got title attributes (full text on hover) after VLM flagged truncation; teaser blur softened 5px→4px + opacity 80→90 after VLM flagged "too dark to look like a gauge"
+- i18n: 18 new keys en+fa (signal.preview*/share*, market.compare/compareHint)
+- QA (agent-browser, all green):
+  1. Desktop EN: locked preview renders all 3 parts (verified via DOM: 5 unlock items, sample title, accuracy strip); compare toggle on → dashed amber line + amber pill (VLM confirmed), off → hidden; tf 1h→4h→1d switching updates the compare label correctly; share button renders in unlocked state (not testable without wallet — code-path reviewed)
+  2. Desktop FA: preview fully Persian, RTL 9/10 from VLM ("strictly adheres to RTL standards")
+  3. Mobile 390px: overflow FIXED (scrollWidth 390), locked preview stacks 2-col checklist + teaser + accuracy strip — VLM 9/10
+  4. Console: zero app errors on fresh loads (mid-round hot-reload artifacts cleared)
+  5. lint clean, tsc src/ 0 errors
+  6. VLM final: locked card 8.5/10 (from 6.5/10 pre-round), compare mode 9/10, FA 9/10, mobile 9/10
+
+Stage Summary:
+- VLM-directed round: identified locked Signal card as the weakest component (6.5/10) → rebuilt it into a conversion-focused preview panel (8.5/10)
+- 3 new features: Locked-signal preview (checklist + blurred real teaser + accuracy strip), Chart Compare mode (normalized daily overlay), Share Signal (Web Share API + clipboard)
+- 2 real mobile bugs found & fixed: overview-cards meta row overflow, backtest table overflow
+- All QA green: EN+FA+mobile+lint+tsc+VLM 8.5-9/10
+- Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) Share button untestable end-to-end without an unlocked wallet session (logic + fallback reviewed); 4) optional roadmap: Telegram/email alerts, session keys

@@ -3,6 +3,9 @@
 /**
  * Candlestick chart (lightweight-charts v5 — TradingView's open-source lib).
  * Timeframe switcher: 15m / 1h / 4h / 1d. Data from our cached API.
+ * Compare mode: a normalized-close overlay of the complementary daily
+ * timeframe, so users can see intraday structure AND the bigger daily
+ * picture on one canvas (0%-based, right axis hidden).
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -16,6 +19,7 @@ import {
   ColorType,
   CrosshairMode,
 } from 'lightweight-charts'
+import { GitCompare } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -51,11 +55,15 @@ function emaSeries(closes: number[], period: number): Array<number | undefined> 
 }
 
 export function PriceChart() {
-  const { t } = useI18n()
+  const { t: tr, tf: tfn } = useI18n()
   const [tf, setTf] = useState<TF>('1h')
   const [showEma20, setShowEma20] = useState(true)
   const [showEma50, setShowEma50] = useState(true)
+  const [compare, setCompare] = useState(false)
   const { data, isLoading } = useCandles(tf)
+  // Compare overlay uses the daily series (or 4h when the main tf IS 1d)
+  const compareTf: TF = tf === '1d' ? '4h' : '1d'
+  const { data: cmpData } = useCandles(compareTf)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -63,6 +71,7 @@ export function PriceChart() {
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const ema20Ref = useRef<ISeriesApi<'Line'> | null>(null)
   const ema50Ref = useRef<ISeriesApi<'Line'> | null>(null)
+  const cmpRef = useRef<ISeriesApi<'Line'> | null>(null)
 
   // Create chart once
   useEffect(() => {
@@ -131,6 +140,21 @@ export function PriceChart() {
     })
     ema50Ref.current = ema50
 
+    // Compare overlay — normalized close of the complementary timeframe,
+    // drawn on its own (hidden) price scale so the percentages read 0-based.
+    const cmp = chart.addSeries(LineSeries, {
+      color: 'rgba(240, 185, 11, 0.85)',
+      lineWidth: 2,
+      lineStyle: 2, // dashed
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+      priceScaleId: 'cmp',
+    })
+    cmp.priceScale().applyOptions({ visible: false })
+    cmp.applyOptions({ visible: false })
+    cmpRef.current = cmp
+
     return () => {
       chart.remove()
       chartRef.current = null
@@ -138,8 +162,9 @@ export function PriceChart() {
       volumeRef.current = null
       ema20Ref.current = null
       ema50Ref.current = null
+      cmpRef.current = null
     }
-     
+
   }, [])
 
   // Update data when candles arrive
@@ -183,6 +208,36 @@ export function PriceChart() {
     ema50Ref.current?.applyOptions({ visible: showEma50 })
   }, [showEma50])
 
+  // Compare overlay: normalized (0-based %) close of the complementary tf,
+  // only within the main chart's visible time window.
+  useEffect(() => {
+    const cmp = cmpRef.current
+    if (!cmp) return
+    if (!compare || !cmpData?.candles?.length || !data?.candles?.length) {
+      cmp.applyOptions({ visible: false })
+      cmp.setData([])
+      return
+    }
+    const mainStart = data.candles[0].time
+    const cmpWindow = cmpData.candles.filter((c) => c.time >= mainStart)
+    if (cmpWindow.length < 2) {
+      cmp.applyOptions({ visible: false })
+      cmp.setData([])
+      return
+    }
+    const base = cmpWindow[0].close
+    const pts = cmpWindow.map((c) => ({
+      time: c.time as import('lightweight-charts').UTCTimestamp,
+      value: ((c.close - base) / base) * 100,
+    }))
+    try {
+      cmp.setData(pts)
+      cmp.applyOptions({ visible: true })
+    } catch (e) {
+      console.error('compare overlay failed', e)
+    }
+  }, [compare, cmpData, data])
+
   // Update time visibility when timeframe changes
   useEffect(() => {
     chartRef.current?.timeScale().applyOptions({
@@ -208,11 +263,11 @@ export function PriceChart() {
             )}
             {data?.stale && (
               <Badge variant="outline" className="border-amber-400/40 text-amber-300 text-[10px]">
-                {t.market.staleData}
+                {tr.market.staleData}
               </Badge>
             )}
           </CardTitle>
-          <div className="flex items-center gap-1 rounded-xl bg-secondary/60 p-1" role="tablist" aria-label={t.market.timeframe}>
+          <div className="flex items-center gap-1 rounded-xl bg-secondary/60 p-1" role="tablist" aria-label={tr.market.timeframe}>
             {TIMEFRAMES.map((item) => (
               <button
                 key={item}
@@ -242,8 +297,8 @@ export function PriceChart() {
           )}
         </div>
         {/* EMA legend / toggles */}
-        <div className="flex flex-wrap items-center gap-2 mt-2" aria-label={t.market.emaLegend}>
-          <span className="text-[11px] text-muted-foreground">{t.market.emaLegend}:</span>
+        <div className="flex flex-wrap items-center gap-2 mt-2" aria-label={tr.market.emaLegend}>
+          <span className="text-[11px] text-muted-foreground">{tr.market.emaLegend}:</span>
           <button
             onClick={() => setShowEma20((v) => !v)}
             aria-pressed={showEma20}
@@ -255,7 +310,7 @@ export function PriceChart() {
             )}
           >
             <span className="h-0.5 w-4 rounded-full bg-[#7be1ff]" aria-hidden />
-            {t.market.ema20}
+            {tr.market.ema20}
           </button>
           <button
             onClick={() => setShowEma50((v) => !v)}
@@ -268,7 +323,22 @@ export function PriceChart() {
             )}
           >
             <span className="h-0.5 w-4 rounded-full bg-[#b48cff]" aria-hidden />
-            {t.market.ema50}
+            {tr.market.ema50}
+          </button>
+          <span aria-hidden className="h-4 w-px bg-border/60 mx-1" />
+          <button
+            onClick={() => setCompare((v) => !v)}
+            aria-pressed={compare}
+            title={tr.market.compareHint}
+            className={cn(
+              'flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-all cursor-pointer',
+              compare
+                ? 'border-amber-400/50 text-amber-300 bg-amber-400/10'
+                : 'border-border/60 text-muted-foreground opacity-70 hover:opacity-100'
+            )}
+          >
+            <GitCompare className="size-3" />
+            {tfn(tr.market.compare, { tf: compareTf })}
           </button>
         </div>
         {/* RSI + MACD subpanels — share the same tf as the main chart */}
