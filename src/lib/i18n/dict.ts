@@ -227,6 +227,42 @@ export const dict = {
       note: 'Sum of daily direction × next-day price change. No leverage, no fees.',
     },
 
+    // Backtest sandbox
+    backtest: {
+      eyebrow: 'Backtest sandbox',
+      title: 'Replay the engine on real history',
+      subtitle:
+        'The same 1D analysis engine, replayed day-by-day over real PENGU candles with the ATR trade plan (entry, stop, 1R/2R/3R targets). One position at a time, 7-day max hold, stop-first on ambiguous days.',
+      window: 'Replay window',
+      trades: 'Paper trades',
+      winRate: 'Win rate',
+      totalR: 'Net result',
+      avgR: 'Avg per trade',
+      profitFactor: 'Profit factor',
+      maxDD: 'Max drawdown',
+      avgHold: 'Avg hold',
+      best: 'Best',
+      worst: 'Worst',
+      days: 'days',
+      rUnit: 'R (risk units)',
+      date: 'Signal day',
+      side: 'Side',
+      entry: 'Entry',
+      result: 'Result',
+      hold: 'Hold',
+      outcome: 'Outcome',
+      long: 'LONG',
+      short: 'SHORT',
+      tradesList: 'Completed trades (newest first)',
+      equityTitle: 'Cumulative R',
+      equityNote: 'Each step is one closed paper trade. R = profit ÷ initial risk.',
+      disclaimer:
+        'Educational simulation on historical data — not executed trades, not a promise of future results. The live product additionally weights 4h/1h/15m timeframes.',
+      skipped: 'actionable signals skipped while a position was open',
+      warmupNote: 'First 60 candles are engine warm-up (indicators stabilise).',
+      empty: 'Not enough closed daily candles yet — the sandbox unlocks as history builds.',
+    },
+
     // Indicator education
     indicatorHelp: {
       emaCross: 'Trend direction: EMA20 above EMA50 means short-term momentum points up (golden-cross zone); below means down.',
@@ -583,6 +619,42 @@ export const dict = {
       bestDay: 'بهترین روز',
       worstDay: 'بدترین روز',
       note: 'جمع جهت روزانه × تغییر قیمت روز بعد. بدون اهرم، بدون کارمزد.',
+    },
+
+    // Backtest sandbox
+    backtest: {
+      eyebrow: 'سندباکس بک‌تست',
+      title: 'بازپخش موتور روی تاریخ واقعی',
+      subtitle:
+        'همان موتور تحلیل روزانه، روز‌به‌روز روی کندل‌های واقعی PENGU بازپخش می‌شود با همان پلن معاملاتی مبتنی بر ATR (ورود، حد ضرر، اهداف ۱R/۲R/۳R). یک پوزیشن در هر لحظه، حداکثر ۷ روز نگهداری، در روزهای مبهم اول حد ضرر.',
+      window: 'بازهٔ بازپخش',
+      trades: 'معاملات کاغذی',
+      winRate: 'نرخ برد',
+      totalR: 'نتیجهٔ خالص',
+      avgR: 'میانگین هر معامله',
+      profitFactor: 'ضریب سود',
+      maxDD: 'حداکثر افت سرمایه',
+      avgHold: 'میانگین نگهداری',
+      best: 'بهترین',
+      worst: 'بدترین',
+      days: 'روز',
+      rUnit: 'R (واحد ریسک)',
+      date: 'روز سیگنال',
+      side: 'جهت',
+      entry: 'ورود',
+      result: 'نتیجه',
+      hold: 'نگهداری',
+      outcome: 'پایان',
+      long: 'لانگ',
+      short: 'شورت',
+      tradesList: 'معاملات کامل‌شده (جدیدترین اول)',
+      equityTitle: 'R تجمعی',
+      equityNote: 'هر پله یک معاملهٔ کاغذی بسته‌شده است. R = سود ÷ ریسک اولیه.',
+      disclaimer:
+        'شبیه‌سازی آموزشی روی داده‌های تاریخی — نه معاملات واقعی و نه وعدهٔ نتیجهٔ آینده. محصول زنده به‌علاوه تایم‌فریم‌های ۴h/1h/15m را هم وزن‌دهی می‌کند.',
+      skipped: 'سیگنال قابل‌اجرای ردشده در حین باز بودن پوزیشن',
+      warmupNote: '۶۰ کندل اول گرم‌کردن موتور است (پایداری اندیکاتورها).',
+      empty: 'هنوز کندل روزانهٔ کافی وجود ندارد — سندباکس با گذر زمان فعال می‌شود.',
     },
 
     // Indicator education

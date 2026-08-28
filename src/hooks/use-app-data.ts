@@ -228,6 +228,53 @@ export function useTrackRecord() {
   })
 }
 
+export interface BacktestTrade {
+  date: string
+  exitDate: string
+  side: 'long' | 'short'
+  verdict: string
+  entry: number
+  stopLoss: number
+  takeProfits: number[]
+  r: number
+  holdDays: number
+  outcome: 'TP3' | 'TP2' | 'TP1' | 'BE' | 'SL' | 'TIMEOUT'
+}
+
+export interface BacktestData {
+  from: string
+  to: string
+  tradingDays: number
+  stats: {
+    trades: number
+    wins: number
+    losses: number
+    breakeven: number
+    winRate: number
+    totalR: number
+    avgR: number
+    bestR: number
+    worstR: number
+    profitFactor: number | null
+    maxDrawdownR: number
+    avgHoldDays: number
+    skippedSignals: number
+    holdDays: number
+  }
+  trades: BacktestTrade[]
+  equity: Array<{ date: string; r: number }>
+  cached?: boolean
+}
+
+export function useBacktest() {
+  return useQuery({
+    queryKey: ['backtest'],
+    queryFn: () => jget<BacktestData>('/api/backtest'),
+    staleTime: 30 * 60_000,
+    retry: 1,
+  })
+}
+
 export function useSession() {
   const { address, isConnected } = useAccount()
   return useQuery({

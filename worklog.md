@@ -272,3 +272,28 @@ Stage Summary:
 - New resilience architecture: safe wagmi config always on + gated AGW mount + error boundary fallback → the app NEVER white-screens from wallet-stack failures, and blocked-network users get an honest actionable state with one-click live retry
 - All QA green: happy path (modal opens), blocked path (graceful degradation EN+FA), live recovery, mobile, lint/tsc
 - Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) note: users behind networks that block privy.abs.xyz/auth.privy.io will see the unavailable state until they change network — this is a network-side limitation, documented in the toast hint; 4) optional roadmap: Telegram alerts, backtest sandbox
+
+---
+Task ID: 9
+Agent: Main Agent (Z.ai Code)
+Task: Round 9 (15-min cron review cycle) — status assessment, QA sweep, new feature: Backtest Sandbox (1D engine replay over real history) + styling polish
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: local == remote == 8936e7b, clean → proceeded
+- STATUS ASSESSMENT: dev log healthy, page loads clean (no console errors), all rounds 1-8 features intact (wallet gate unavailable-state, Abstract Profile treasury identity, renewal strip). No bugs found → proceeded to new-feature work per the cron mandate
+- NEW FEATURE — Backtest Sandbox (public, builds trust in the paid signal product):
+  1. src/lib/backtest/replay.ts — deterministic 1D-engine replay over real daily candles: signal day D sees ONLY candles before D (same code path as live: analyzeTimeframe with last candle dropped); actionable verdicts open paper trades with the same ATR plan math as buildPlan (entry = close−0.1·ATR, SL = ∓1.5·ATR, TPs = 1R/2R/3R); ONE position at a time, 7-day max hold, TP ladder 50/30/20 with stop→breakeven after TP1 and stop→TP1 after TP2, pessimistic stop-first on ambiguous days, all results in R-multiples; trades with incomplete simulation windows at the data edge are EXCLUDED (honesty fix after first smoke test showed a half-simulated TIMEOUT)
+  2. /api/backtest route — public, rate-limited 30/min/IP, deterministic result memoized 1h in memory (candle fetch itself cached 10min upstream) → zero marginal upstream cost
+  3. Data reality: GeckoTerminal exposes 181 daily candles for the PENGU pool (2026-02-29→); warmup 60 → 120-day replay window; EMA200 gracefully falls back to SMA(100) consistently with live behavior
+  4. UI src/components/landing/backtest.tsx — new landing section between Track Record and Features: 6 gradient stat cards (trades W/L, win rate, net R animated counter, profit factor, max drawdown + avg hold, best/worst), animated SVG STEP equity curve in cumulative R with per-trade hover dots + tooltip + date localization, trades table (newest first, outcome badges TP3/TP2/TP1/BE/TIMEOUT/SL color-coded, side with trend icons, entry $, hold days, R colored) inside max-h-96 nice-scroll, amber disclaimer box (educational simulation, live product weights more timeframes)
+  5. Hooks: useBacktest (TanStack Query, 30-min staleTime); i18n: 30 new keys en+fa full section; page.tsx wiring; globals.css: new .nice-scroll slim themed scrollbar utility (styling mandate)
+- REAL RESULT (honest numbers): 15 completed trades over 2026-04-30→2026-08-27, 40% win rate, +1.92R net, PF 1.44, maxDD −4.63R, avg hold 5d — plausible, not cherry-picked
+- INFRA NOTE: the sandbox dev server began dying between bash commands this round (process reaper kills background children when each command exits) — QA adapted by starting the server + browser checks inside single long-running bash invocations; server auto-recovers or restarts as needed
+- QA (all green): lint clean, tsc src/ 0 errors; API smoke (15 trades, cached:true on 2nd call); browser E2E: section renders with real data EN (15 table rows, SVG curve, 6 stat cards), VLM visual review 9/10 (cards aligned, curve readable, badges clean); Persian RTL verified (title/stats/disclaimer Persian, dir=rtl, R values intact, chart stays LTR via chart-ltr); mobile 390px no overflow, grid collapses to 2 cols; zero console errors
+- Commit + push (this round's close-out)
+
+Stage Summary:
+- No bugs found in the sweep; product stable across rounds 1-8
+- New public feature shipped: Backtest Sandbox — deterministic, no-look-ahead 1D engine replay with conservative assumptions (stop-first, non-overlapping, edge-excluded), full EN/FA + RTL + mobile, honest +1.92R/15-trade result displayed with educational disclaimer
+- Styling mandate satisfied: gradient stat cards, animated step-equity curve with hover tooltips, themed slim scrollbars, outcome badges
+- Unresolved/next-phase items: 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) backtest currently 1D-only (intraday history unavailable) — documented honestly in UI; 4) optional roadmap: Telegram/email alerts for subscribers, session-key auto-renew only if product justifies security review

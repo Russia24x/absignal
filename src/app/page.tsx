@@ -9,6 +9,7 @@
 import { Header } from '@/components/landing/header'
 import { Hero } from '@/components/landing/hero'
 import { TrackRecord } from '@/components/landing/track-record'
+import { BacktestSandbox } from '@/components/landing/backtest'
 import { Features } from '@/components/landing/features'
 import { Pricing } from '@/components/landing/pricing'
 import { Faq } from '@/components/landing/faq'
@@ -66,6 +67,7 @@ export default function Home() {
         </section>
 
         <TrackRecord />
+        <BacktestSandbox />
         <Features />
         <Pricing />
         <Faq />
