@@ -345,3 +345,38 @@ Stage Summary:
 - Styling polish: hero verdict words now glow per-color, AnimatedNumber component ready for future stat counters
 - All QA green: EN+FA+mobile+lint+tsc, zero console errors
 - Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) optional roadmap: Telegram/email alerts for subscribers, session-key auto-renew only if product justifies mainnet security review
+
+---
+Task ID: 11
+Agent: Main Agent (Z.ai Code)
+Task: Round 11 (cron review cycle) — status assessment + QA sweep, bug fix (favicon 404), 2 new features (Signal Calendar heatmap, Price Alerts) + styling polish
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: local == remote == 64a8fa3, clean → proceeded
+- STATUS ASSESSMENT (agent-browser): page loads clean, zero app console errors, all 8 sections render with real data (ticker $0.00933, backtest 15 trades, 21 chart canvases), FA/RTL works, mobile 390px no overflow, wallet stack healthy (Privy reachable in sandbox). One real bug found: /pengu.svg favicon 404 on EVERY page load (layout.tsx references it, public/ never had it)
+- BUG FIX — favicon: created public/pengu.svg — custom penguin icon matching the ice/frost brand (dark gradient rounded square, penguin with frost-ring body, aurora scarf green→cyan gradient, orange beak, frost sparkles); curl 200 confirmed; browser tab now shows the brand icon
+- NEW FEATURE 1 — Signal Calendar (src/components/landing/signal-calendar.tsx), replaces the old 30-day OutcomeTimeline strip in Track Record:
+  • Monthly verdict heatmap: day cells colored by verdict intensity (STRONG_BUY bull/30+border55, BUY bull/15, SELL bear/15, STRONG_SELL bear/30, HOLD muted, LOCKED primary/10 + lock icon) with WIN/LOSS outcome dots bottom-end
+  • Month navigation bounded by real data range (prev/next disabled at edges — correct: all current history lives in Aug 2026); default = newest signal month; weekday headers localized (FA gets Saturday-start weeks ش ی د س چ پ ج, EN Sunday-start S M T W T F S); month names localized (اوت ۲۰۲۶ / August 2026); Persian digit day numbers
+  • Streak chips: current streak (Flame/Snowflake icon, win=green loss=red) + best win run (Trophy) — singular/plural grammar handled (streakWinOne/streakLossOne keys after VLM caught "1 losses in a row")
+  • Hover tooltips: date + verdict + score + next-day % + outcome; "Click for full signal →" hint
+  • Click resolved day → opens the existing SignalDetailDialog (verified: dialog shows 2026-08-07 with gauge + indicators)
+  • Legend row: verdict swatches (STRONG BUY/STRONG SELL), WIN/LOSS dots, today-ring sample + "Cell color = verdict · dot = outcome" explanation (added after VLM flagged verdict-vs-outcome ambiguity on mixed cells)
+  • Loading skeleton (SignalCalendarSkeleton); today ring highlight; hover scale+glow on clickable cells
+- NEW FEATURE 2 — Price Alerts (src/components/market/price-alerts.tsx), new card in the terminal market column below HourlyHeatmap:
+  • Client-side alerts: direction toggle (Above/Below) + target price input + Set alert button; quick ±5%/±10% chips computed from live price
+  • Checked on every market refresh (45 s) AND on alert-list change — two real bugs found & fixed during QA: (1) newly-added already-satisfied alerts never fired because the check effect only ran on price change; (2) persist effect wiped localStorage on mount before the deferred load microtask ran (loadedRef gate added)
+  • Trigger → sonner toast (🔔 localized) + optional browser Notification (permission-gated with opt-in button + granted-state pulse badge)
+  • localStorage persistence (pengu_price_alerts_v1), validated schema on load; max 6 active, duplicate detection, triggered list keeps last 3 with localized time; delete per row; hydration-safe (deferred microtask load satisfies react-hooks/set-state-in-effect)
+  • Verified E2E: +5% chip adds alert → persisted; below-alert at $0.02 (already satisfied) fires immediately with Persian toast; survives reload with triggered state; empty state after cleanup
+- i18n: 30+ new keys en+fa (calendar.* incl. legend + singular streaks, alerts.* full section)
+- QA (agent-browser, all green): lint clean; tsc src/ 0 errors; EN+FA render verified (calendar grid 35 cells Aug 2026, 21 clickable days, legend, streak chips, alerts card with input/toggle/chips); day-click opens detail dialog; trigger flow + persistence + reload; EN→FA→EN language cycle clean; mobile 390px no overflow; VLM reviews: calendar 9/10 → grammar+legend fixes → re-verified, alerts card 9.5/10; zero app console errors (only pre-existing empty AGW/Privy probe artifacts, same as rounds 7-10)
+- INFRA NOTE: dev server was killed by the sandbox reaper mid-round (same as round 9) — restarted detached (nohup), recovered cleanly
+- Mid-round transient: one SignalCalendar render error during dict.ts hot-reload (stale module graph) — caught by the Round-8 AgwBoundary error boundary exactly as designed, full reload recovered; clean language-switch cycle afterwards confirmed no real issue (both dicts structurally complete, tsc 0 errors)
+
+Stage Summary:
+- 1 bug fixed: favicon 404 on every page load → custom branded penguin SVG icon
+- 2 new features shipped: Signal Calendar (monthly verdict heatmap with bounded navigation, streaks, tooltips, day-click detail dialog, legend) and Price Alerts (client-side, persistent, toast + browser notifications, quick chips)
+- 3 bugs caught & fixed during feature QA: alert-check effect dependency, localStorage wipe race, streak singular grammar (VLM-caught)
+- All QA green: lint, tsc, E2E EN+FA, trigger/persistence flows, mobile, VLM 9-9.5/10
+- Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) calendar navigation untestable with real multi-month data until history grows past one month (logic verified via bounded-disabled state); 4) optional roadmap: Telegram/email alerts, session keys

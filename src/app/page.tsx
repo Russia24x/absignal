@@ -21,6 +21,7 @@ import { Snowfall } from '@/components/landing/snowfall'
 import { BackToTop } from '@/components/landing/back-to-top'
 import { MarketOverviewCards } from '@/components/market/overview-cards'
 import { PriceChart } from '@/components/market/price-chart'
+import { PriceAlerts } from '@/components/market/price-alerts'
 import { SentimentGauge } from '@/components/market/sentiment-gauge'
 import { HourlyHeatmap } from '@/components/market/hourly-heatmap'
 import { SignalCard } from '@/components/signal/signal-card'
@@ -56,10 +57,11 @@ export default function Home() {
             <MarketOverviewCards />
 
             <div className="grid lg:grid-cols-[1.25fr_1fr] gap-6 items-start">
-              {/* Market column: chart + hourly heatmap */}
+              {/* Market column: chart + hourly heatmap + price alerts */}
               <div className="space-y-6">
                 <PriceChart />
                 <HourlyHeatmap />
+                <PriceAlerts />
               </div>
               {/* Intelligence column: today's signal + sentiment index */}
               <div className="space-y-6">

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d3a56"/>
+      <stop offset="1" stop-color="#061019"/>
+    </linearGradient>
+    <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f0faff"/>
+      <stop offset="1" stop-color="#b9dff2"/>
+    </linearGradient>
+    <linearGradient id="scarf" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3ddc97"/>
+      <stop offset="1" stop-color="#7be1ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- frost-dark rounded background -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="none" stroke="#7be1ff" stroke-opacity="0.25" stroke-width="1.5"/>
+
+  <!-- penguin body -->
+  <ellipse cx="32" cy="35" rx="17" ry="20" fill="#0c2033" stroke="#7be1ff" stroke-opacity="0.3" stroke-width="1.5"/>
+
+  <!-- belly -->
+  <ellipse cx="32" cy="42" rx="11" ry="12" fill="url(#belly)"/>
+
+  <!-- eyes -->
+  <circle cx="25" cy="26" r="3.6" fill="#ffffff"/>
+  <circle cx="39" cy="26" r="3.6" fill="#ffffff"/>
+  <circle cx="25.9" cy="26.7" r="1.7" fill="#061019"/>
+  <circle cx="39.9" cy="26.7" r="1.7" fill="#061019"/>
+
+  <!-- beak -->
+  <path d="M28 31 L36 31 L32 36.5 Z" fill="#ffb340"/>
+
+  <!-- aurora scarf -->
+  <path d="M19 43 Q32 51 45 43" fill="none" stroke="url(#scarf)" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- frost sparkles -->
+  <circle cx="12" cy="13" r="1.6" fill="#7be1ff" opacity="0.9"/>
+  <circle cx="53" cy="17" r="1.2" fill="#7be1ff" opacity="0.6"/>
+  <circle cx="49" cy="50" r="1" fill="#3ddc97" opacity="0.5"/>
+</svg>

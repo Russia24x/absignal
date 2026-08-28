@@ -19,6 +19,7 @@ import { useTrackRecord } from '@/hooks/use-app-data'
 import { useCountUp } from '@/hooks/use-count-up'
 import { SignalDetailDialog } from '@/components/signal/signal-detail-dialog'
 import { EquityCurve } from '@/components/landing/equity-curve'
+import { SignalCalendar, SignalCalendarSkeleton } from '@/components/landing/signal-calendar'
 import { cn } from '@/lib/utils'
 
 /* ----------------------------- Visual widgets ----------------------------- */
@@ -52,58 +53,6 @@ function AccuracyDonut({ accuracy }: { accuracy: number | null }) {
           {animated.toFixed(0)}%
         </span>
       </div>
-    </div>
-  )
-}
-
-/** Horizontal strip of colored cells — one per day (WIN/LOSS/FLAT/LOCKED). */
-function OutcomeTimeline({
-  entries,
-  labels,
-}: {
-  entries: Array<{ date: string; outcome: string; verdict: string }>
-  labels: { win: string; loss: string; flat: string; locked: string }
-}) {
-  const cells = entries.slice(0, 30)
-  if (cells.length === 0) return null
-
-  return (
-    <div className="flex items-end gap-[3px] h-10 chart-ltr" dir="ltr" role="img" aria-label={labels.win + '/' + labels.loss}>
-      {cells
-        .slice()
-        .reverse()
-        .map((e) => {
-          const isWin = e.outcome === 'WIN'
-          const isLoss = e.outcome === 'LOSS'
-          const isLocked = e.verdict === 'LOCKED' || e.outcome === 'PENDING'
-          const height = isWin ? 'h-10' : isLoss ? 'h-6' : 'h-4'
-          const color = isWin
-            ? 'bg-bull/80'
-            : isLoss
-              ? 'bg-bear/80'
-              : isLocked
-                ? 'bg-primary/25'
-                : 'bg-muted-foreground/30'
-          const tip = isWin ? labels.win : isLoss ? labels.loss : isLocked ? labels.locked : labels.flat
-          return (
-            <TooltipProvider key={e.date}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    className={cn(
-                      'flex-1 min-w-0 rounded-[3px] timeline-cell cursor-default',
-                      height,
-                      color
-                    )}
-                  />
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  <span className="font-mono">{e.date}</span> · {tip}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )
-        })}
     </div>
   )
 }
@@ -220,40 +169,23 @@ export function TrackRecord() {
           </motion.div>
         )}
 
-        {/* Outcome timeline strip */}
-        {data && data.entries.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.12 }}
-            className="rounded-2xl glass border-border/60 p-4 mb-6"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <span className="text-xs font-semibold text-muted-foreground">{t.track.timeline}</span>
-              <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <span className="size-2 rounded-[2px] bg-bull/80" /> {t.track.timelineWin}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="size-2 rounded-[2px] bg-bear/80" /> {t.track.timelineLoss}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="size-2 rounded-[2px] bg-primary/25" /> {t.track.timelinePending}
-                </span>
-              </div>
-            </div>
-            <OutcomeTimeline
+        {/* Signal calendar (monthly verdict heatmap) */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.12 }}
+          className="mb-6"
+        >
+          {isLoading ? (
+            <SignalCalendarSkeleton />
+          ) : data && data.entries.length > 0 ? (
+            <SignalCalendar
               entries={data.entries}
-              labels={{
-                win: t.track.win,
-                loss: t.track.loss,
-                flat: t.track.neutralOutcome,
-                locked: t.track.pending,
-              }}
+              onPickDate={(d) => setDetailDate(d)}
             />
-          </motion.div>
-        )}
+          ) : null}
+        </motion.div>
 
         {/* Table */}
         <motion.div

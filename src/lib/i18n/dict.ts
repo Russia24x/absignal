@@ -238,6 +238,48 @@ export const dict = {
       timelinePending: 'Locked',
     },
 
+    // Signal calendar
+    calendar: {
+      title: 'Signal calendar',
+      streakWins: '{n} wins in a row',
+      streakLosses: '{n} losses in a row',
+      streakWinOne: '1 win in a row',
+      streakLossOne: '1 loss in a row',
+      bestStreak: 'Best run',
+      noData: 'The engine is collecting its first candles. The calendar fills as signals lock.',
+      prevMonth: 'Previous month',
+      nextMonth: 'Next month',
+      clickHint: 'Click for full signal →',
+      legendVerdict: 'Cell color = verdict · dot = outcome',
+      legendToday: 'Today',
+    },
+
+    // Price alerts
+    alerts: {
+      title: 'Price alerts',
+      direction: 'Direction',
+      above: 'Above',
+      below: 'Below',
+      target: 'Target price ($)',
+      add: 'Set alert',
+      quick: 'Quick:',
+      invalid: 'Enter a valid target price',
+      duplicate: 'You already have this alert',
+      maxAlerts: 'Maximum 6 active alerts',
+      currentPrice: 'Now',
+      empty: 'No alerts yet — set a target and keep this tab open.',
+      firesAbove: 'fires when price rises to target',
+      firesBelow: 'fires when price falls to target',
+      triggeredToast: '🔔 PENGU crossed {price} — price alert fired',
+      triggeredLabel: 'Triggered',
+      remove: 'Remove alert',
+      notifyEnable: 'Enable browser notifications',
+      notifyGranted: 'Notifications on',
+      notifyDenied: 'Notifications are blocked in your browser settings',
+      notifyUnsupported: 'Notifications not supported in this browser',
+      disclaimer: 'Client-side alerts — checked every 45 s while this tab is open.',
+    },
+
     // Strategy equity curve
     equity: {
       title: 'Strategy equity curve',
@@ -675,6 +717,48 @@ export const dict = {
       timelineLoss: 'ناموفق',
       timelineFlat: 'تخت',
       timelinePending: 'قفل',
+    },
+
+    // Signal calendar
+    calendar: {
+      title: 'تقویم سیگنال‌ها',
+      streakWins: '{n} برد متوالی',
+      streakLosses: '{n} باخت متوالی',
+      streakWinOne: '۱ برد متوالی',
+      streakLossOne: '۱ باخت متوالی',
+      bestStreak: 'بهترین رکورد',
+      noData: 'موتور در حال جمع‌آوری اولین کندل‌هاست. با قفل شدن سیگنال‌ها تقویم پر می‌شود.',
+      prevMonth: 'ماه قبل',
+      nextMonth: 'ماه بعد',
+      clickHint: 'برای دیدن سیگنال کامل کلیک کنید ←',
+      legendVerdict: 'رنگ خانه = سیگنال · نقطه = نتیجه',
+      legendToday: 'امروز',
+    },
+
+    // Price alerts
+    alerts: {
+      title: 'هشدار قیمت',
+      direction: 'جهت',
+      above: 'بالاتر از',
+      below: 'پایین‌تر از',
+      target: 'قیمت هدف ($)',
+      add: 'ثبت هشدار',
+      quick: 'سریع:',
+      invalid: 'یک قیمت هدف معتبر وارد کنید',
+      duplicate: 'این هشدار از قبل ثبت شده است',
+      maxAlerts: 'حداکثر ۶ هشدار فعال',
+      currentPrice: 'اکنون',
+      empty: 'هنوز هشداری ثبت نشده — یک هدف تعیین کنید و همین تب را باز نگه دارید.',
+      firesAbove: 'با رسیدن قیمت به هدف، فعال می‌شود',
+      firesBelow: 'با افت قیمت به هدف، فعال می‌شود',
+      triggeredToast: '🔔 پنگو از {price} عبور کرد — هشدار قیمت فعال شد',
+      triggeredLabel: 'فعال شد',
+      remove: 'حذف هشدار',
+      notifyEnable: 'فعال‌سازی اعلان‌های مرورگر',
+      notifyGranted: 'اعلان‌ها روشن',
+      notifyDenied: 'اعلان‌ها در تنظیمات مرورگر شما مسدود شده‌اند',
+      notifyUnsupported: 'اعلان‌ها در این مرورگر پشتیبانی نمی‌شوند',
+      disclaimer: 'هشدارهای سمت کاربر — هر ۴۵ ثانیه در صورت باز بودن همین تب بررسی می‌شوند.',
     },
 
     // Strategy equity curve
