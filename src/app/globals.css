@@ -302,6 +302,30 @@
   direction: ltr;
 }
 
+/* Hero mascot — two quiet life signs (bob + blink), nothing more */
+@keyframes mascot-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.animate-mascot-bob {
+  animation: mascot-bob 5s ease-in-out infinite;
+}
+@keyframes mascot-blink {
+  0%, 91.5%, 95.5%, 100% { transform: scaleY(1); }
+  93.5% { transform: scaleY(0.08); }
+}
+.mascot-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mascot-blink 6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-mascot-bob,
+  .mascot-eyes {
+    animation: none;
+  }
+}
+
 /* Slim themed scrollbar for scrollable tables/lists */
 .nice-scroll {
   scrollbar-width: thin;

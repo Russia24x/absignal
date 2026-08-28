@@ -55,6 +55,9 @@ export interface HistoryEntry {
   changePercent: number | null
   /** WIN | LOSS | NEUTRAL | PENDING */
   outcome: 'WIN' | 'LOSS' | 'NEUTRAL' | 'PENDING'
+  /** True = pre-launch walk-forward reconstruction (real candles, same
+   *  engine, no look-ahead) rather than a signal locked live on the day. */
+  backfilled: boolean
 }
 
 export interface HistoryResult {
@@ -117,6 +120,7 @@ export async function getSignalHistory(limit = 30): Promise<HistoryResult> {
         priceNextDay: null,
         changePercent: null,
         outcome: 'PENDING' as const,
+        backfilled: false,
       }
     }
 
@@ -129,6 +133,7 @@ export async function getSignalHistory(limit = 30): Promise<HistoryResult> {
       priceNextDay,
       changePercent,
       outcome,
+      backfilled: s.backfilled,
     }
   })
 
@@ -188,6 +193,7 @@ export async function backfillHistory(): Promise<number> {
             verdict,
             score,
             confidence: 50,
+            backfilled: true,
             dataJson: JSON.stringify({
               date,
               generatedAt: day.time * 1000,

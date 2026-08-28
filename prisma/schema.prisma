@@ -102,6 +102,9 @@ model DailySignal {
   dataJson       String
   /// PENGU price (USD) at computation time
   priceAtSignal  Float
+  /// True when the entry was reconstructed walk-forward from historical
+  /// candles (pre-launch backfill) rather than locked live on the day.
+  backfilled     Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   @@index([date])

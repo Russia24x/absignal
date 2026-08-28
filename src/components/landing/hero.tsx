@@ -1,14 +1,15 @@
 'use client'
 
 /**
- * Minimal hero: live price badge → headline → one sentence → two CTAs.
- * The price pill is the only live element; every decoration is gone.
+ * Minimal hero: mascot → live price badge → headline → one sentence → two CTAs.
+ * The price pill is the only live element; the mascot is the single brand mark.
  */
 
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/lib/i18n/context'
 import { useMarketOverview } from '@/hooks/use-app-data'
+import { HeroMascot } from '@/components/landing/hero-mascot'
 import { cn } from '@/lib/utils'
 
 export function Hero() {
@@ -21,6 +22,12 @@ export function Hero() {
     <section id="top" className="pt-32 pb-16 sm:pt-40 sm:pb-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
+          {/* Minimal mascot — the frost penguin, quietly presenting the market */}
+          <div className="flex justify-center mb-5">
+            <HeroMascot size={64} className="sm:hidden" />
+            <HeroMascot size={72} className="hidden sm:block" />
+          </div>
+
           {/* Live price badge */}
           <div className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card px-4 py-1.5 text-sm">
             <span className="relative flex size-2">

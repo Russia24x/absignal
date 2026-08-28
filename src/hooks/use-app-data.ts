@@ -109,6 +109,8 @@ export interface HistoryEntry {
   priceNextDay: number | null
   changePercent: number | null
   outcome: 'WIN' | 'LOSS' | 'NEUTRAL' | 'PENDING'
+  /** True = pre-launch walk-forward reconstruction from real historical candles. */
+  backfilled: boolean
 }
 
 export interface HistoryResult {

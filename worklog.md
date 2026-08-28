@@ -842,3 +842,33 @@ Stage Summary:
 - Visual noise is gone (flat surfaces, one accent, semantic color only), verified by VLM at 9/8/9 with all flagged polish items addressed.
 - All security gates unchanged and green (34/34 e2e — server-side entitlements, expiry cutoffs, anti-tamper).
 - Remaining environmental limits only: live funded-wallet payment smoke test needs a real network (sandbox sometimes blocks privy.abs.xyz — the AGW modal DID open in this round's test, so the backend is intermittently reachable); owner must fund the treasury before go-live.
+
+---
+Task ID: 25
+Agent: orchestrator (main)
+Task: Owner request (Persian) — (1) "Is the signal performance & history system real?" — audit and answer honestly; (2) add a MINIMAL mascot to the hero.
+
+Work Log:
+- SYNC CHECK (Rule 2): clean, up-to-date with origin/main @ ac4faa0 (R24). Cron list = 0 jobs (permanent owner directive honored — no 15-min review job created).
+- REALNESS AUDIT (answered with code evidence, not just words):
+  • Market data = REAL: GeckoTerminal OHLCV for PENGU/WETH pool on Abstract (geckoterminal.ts — TTL cache + token bucket + stale-serve; no synthetic data anywhere).
+  • Today's signal = REAL: 8-indicator multi-timeframe engine on live candles, deterministic, locked per UTC day in DailySignal (one row per day, everyone sees the same verdict).
+  • Track record = REAL: locked verdicts scored against the ACTUAL next-day close from the same source; WIN/LOSS needs >0.3% move, else NEUTRAL; unresolved days masked as LOCKED (no paid-content leak).
+  • Equity curve = derived from that same audited record (verdict direction × real next-day change).
+  • Backtest = real walk-forward replay on historical candles, honestly labeled.
+  • ONE NUANCE FOUND & FIXED: the first 21 days of history were pre-launch walk-forward reconstructions (real candles, same engine, no look-ahead) mixed into the track record WITHOUT a public marker. The data was always real, but the reconstruction nature wasn't disclosed in the UI.
+- TRANSPARENCY UPGRADE (this round's core change):
+  • Prisma: DailySignal gained `backfilled Boolean @default(false)` (db:push'd; existing 21 rows migrated via one-time script matching the backfill signature — 21/22 flagged, the 1 live day correctly unflagged).
+  • daily.ts: backfillHistory() now writes backfilled:true; HistoryEntry exposes the flag through /api/signal/history.
+  • track-record.tsx: backfilled dates carry a small ◆ marker (tooltip on hover) + a one-line disclosure footnote under the table, shown ONLY when such days exist. i18n EN+FA (track.backfilledNote) — explains walk-forward reconstruction honestly ("real historical candles, no look-ahead, so the record starts honest instead of empty").
+  • Verified in DOM: 22 rows, 21 ◆ marks, footnote renders EN + FA.
+- HONESTY SPOT-CHECK: /api/signal/history currently reports accuracy 28.57% (4W/10L/7N) — the system shows its real, unflattering number. No inflation anywhere.
+- DEV-OPS: history API initially served backfilled:false because the running dev server held a pre-migration Prisma client in memory; restarted the server (setsid pattern) — API now returns 21 backfilled / 1 live.
+- MINIMAL HERO MASCOT (owner request): new src/components/landing/hero-mascot.tsx — flat frost penguin (solid fills, hairline frost stroke, NO gradients to match R24's flat system), one bull-green signal wave as the brand identity, 72px desktop / 64px mobile, centered above the price badge. Two quiet CSS animations in globals.css: 5s bob + 6s blink (with prefers-reduced-motion: none). Decorative (aria-hidden).
+- VERIFICATION: tsc 0 errors · lint clean · e2e-auth 34/34 · browser QA: mascot renders + animates (computed mascot-bob), ◆ markers + footnote EN/FA, RTL dir=rtl correct, mobile 390px scrollWidth=390 (no overflow, mascot 64px), console 0 errors · VLM: EN hero 8/10 ("minimal/integrated, defect-free"), FA hero mascot 9/10 + RTL 10/10, mobile 8/10 (no clipping; cosmetic footer tightness only).
+- Git: committed & pushed to github.com/Russia24x/absignal (no force, per Rule 1).
+
+Stage Summary:
+- OWNER'S QUESTION ANSWERED: the performance/history system is real end-to-end — real market data, deterministic locked signals, outcomes scored against actual next-day prices. The only gap (undisclosed pre-launch reconstruction) is now explicitly marked ◆ and footnoted in EN+FA, so the track record is not just real but provably transparent.
+- Minimal mascot lives in the hero: flat, quiet, animated subtly — matches the R24 design system (verified 9/10 by VLM).
+- All gates green. Known environmental limits unchanged (sandbox blocks privy.abs.xyz for live wallet tests; treasury funding pending owner).

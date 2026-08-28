@@ -224,7 +224,26 @@ export function TrackRecord() {
                             )}
                             onClick={clickable ? () => setDetailDate(e.date) : undefined}
                           >
-                          <TableCell className="font-mono text-xs whitespace-nowrap">{e.date}</TableCell>
+                          <TableCell className="font-mono text-xs whitespace-nowrap">
+                            {e.date}
+                            {e.backfilled && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className="ms-1 text-[9px] align-middle text-muted-foreground/70 cursor-help"
+                                      aria-label={t.track.backfilledNote}
+                                    >
+                                      ◆
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-64 text-xs">
+                                    <p>{t.track.backfilledNote}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </TableCell>
                           <TableCell>{verdictBadge(e.verdict, t.signal.verdicts as Record<string, string>)}</TableCell>
                           <TableCell
                             className={cn(
@@ -287,6 +306,13 @@ export function TrackRecord() {
               )}
             </CardContent>
           </Card>
+          {/* Pre-launch reconstruction disclosure — shown only when such days exist */}
+          {(data?.entries ?? []).some((e) => e.backfilled) && (
+            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/80 flex items-start gap-1.5">
+              <span className="text-[9px] mt-0.5" aria-hidden>◆</span>
+              <span>{t.track.backfilledNote}</span>
+            </p>
+          )}
         </motion.div>
 
       <SignalDetailDialog date={detailDate} onOpenChange={(open) => !open && setDetailDate(null)} />
