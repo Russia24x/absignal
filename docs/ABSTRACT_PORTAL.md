@@ -100,3 +100,52 @@ renewal UX delivers the same outcome — uninterrupted daily signals — with th
 user signing exactly one transaction per renewal period. If the product later
 justifies it, the session-key path (createSession/toSessionClient from
 `@abstract-foundation/agw-client`) remains open and documented.
+
+## 8. Abstract Profile integration (build.abs.xyz AGW Reusable — 2026-08, round 7)
+
+We adopted the official **Abstract Profile** reusable
+([docs](https://build.abs.xyz/docs/abstract-portal/abstract-profile)) — the
+component that renders a wallet's Abstract Portal identity (PFP, tier 1-5,
+badges) — adapted to this project's standards.
+
+### What was integrated
+
+| Piece | File | Notes |
+|---|---|---|
+| Hardened proxy route | `src/app/api/user-profile/[address]/route.ts` | Upstream `https://backend.portal.abs.xyz/api/user/address/{addr}` (extracted from the official registry JSON `build.abs.xyz/r/abstract-profile.json`). Rate-limited 30/min/IP, 5-min LRU cache, 15s timeout, 404 pass-through |
+| Tier system | `src/lib/abstract/tier-colors.ts` | Official Bronze/Silver/Gold/Platinum/Diamond colors (1-5) + Persian tier names |
+| Profile client | `src/lib/abstract/get-user-profile.ts` | Official `AbstractPortalProfile` type; **improved PFP resolver**: `overrideProfilePictureUrl → avatars/{season}-{tier}-{key}.png` (verified against real profiles: jarrodwatts s1/t1/k2 → 1-1-2.png ✓, Peyman24x s1/t1/k3 → 1-1-3.png ✓) |
+| Query hooks | `src/hooks/use-abstract-profile.ts` | Official pattern (1-min own profile / 5-min others, no retry on 4xx) |
+| Component | `src/components/abstract/abstract-profile.tsx` | Official component + i18n tier tooltip, monogram fallback for profile-less wallets (official falls back to a static default avatar — we show the address monogram instead, so no one is shown a misleading avatar) |
+
+### Where it shows in the product
+
+1. **Wallet menu (header)** — the connected wallet's Portal identity: PFP with
+   tier-colored ring on the trigger, and inside the dropdown the profile name,
+   tier + badge count, "View on Portal" link (`https://abs.xyz/profile/{addr}`).
+   Wallets without a Portal profile get a gentle "create yours at abs.xyz" hint.
+2. **Payment dialog (trust signal)** — the treasury row now shows the
+   treasury's *verified* Portal identity (PFP + name "Peyman24x" +
+   "Verified receiver" badge) instead of a bare address, with graceful
+   fallback to the truncated address if the Portal API is unreachable.
+
+### Verification (QA round 7)
+
+- API: 200 with real profile / cache-hit on 2nd call (`x-profile-cache: hit`) /
+  404 no-profile / 400 invalid address — all confirmed via curl
+- Payment dialog E2E (session fixture): Persian + English rows render the real
+  treasury identity; mocked-404 correctly falls back to the address; VLM
+  visual review passed (avatar ring, badge, layout) on desktop + 390px mobile
+- lint clean, `tsc` src/ 0 errors
+
+### Other build.abs.xyz capabilities reviewed (kept as-is)
+
+- **Connect Wallet / SIWE / Onboarding Dialog reusables** — our custom
+  components already implement these flows on the same AGW SDK; adopting the
+  stock components would *reduce* functionality (i18n, RTL, auto sign-in).
+- **Session Key Management** — still deliberately deferred (see §7).
+- **Abstract App Voting** — Portal-governance specific, not applicable to a
+  signal product.
+- **AI-agent resources** (llms.txt / llms-full.txt / SKILL.MD / docs MCP) —
+  used for this audit; the `.md` suffix trick works on all docs.abs.xyz pages
+  and is our documented way to re-audit alignment in future rounds.

@@ -310,6 +310,13 @@ export const dict = {
       wrongNetwork: 'Wrong network',
       authFailed: 'Sign-in failed — please try again',
       authDeclined: 'Signature declined',
+      portalProfile: 'Abstract Portal',
+      portalNoProfile: 'No Portal profile yet',
+      portalCreateHint: 'Create yours at abs.xyz',
+      tier: 'Tier',
+      badgesCount: '{n} badges',
+      viewPortal: 'View on Portal',
+      paidToVerified: 'Verified receiver',
     },
 
     // Section eyebrows (small kicker labels above headings)
@@ -653,6 +660,13 @@ export const dict = {
       wrongNetwork: 'شبکه اشتباه',
       authFailed: 'ورود ناموفق بود — دوباره تلاش کنید',
       authDeclined: 'امضا لغو شد',
+      portalProfile: 'Abstract Portal',
+      portalNoProfile: 'هنوز پروفایل Portal ندارید',
+      portalCreateHint: 'در abs.xyz بسازید',
+      tier: 'سطح',
+      badgesCount: '{n} نشان',
+      viewPortal: 'مشاهده در Portal',
+      paidToVerified: 'گیرنده تأییدشده',
     },
 
     // Section eyebrows (small kicker labels above headings)

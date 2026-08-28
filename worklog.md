@@ -202,3 +202,37 @@ Stage Summary:
 - New user-facing feature: subscription lifecycle strip with one-click stacking renewal (the honest "auto-renew" without custodial risk)
 - All QA green: E2E 18/18, lint clean, tsc clean, 3-state browser verification EN+FA, mobile OK, VLM 9/10
 - Unresolved/next-phase items: 1) AGW payment live smoke test with funded account (still the main acceptance gap); 2) Cloudflare deployment (docs ready — owner account needed); 3) Optional roadmap: Telegram/email alerts for subscribers, backtest sandbox UI; session-key auto-renew only if product justifies the mainnet security-review process
+
+---
+Task ID: 7
+Agent: Main Agent (Z.ai Code)
+Task: Round 7 — Abstract Ecosystem deep-integration per owner request: official Abstract Profile (build.abs.xyz AGW Reusable) into the product, docs alignment re-audit (docs.abs.xyz AI-agents resources, AGW overview, JSON-RPC API, build.abs.xyz capabilities review)
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: fetch OK, local == remote == 525d31c, clean → proceeded
+- DOCS RESEARCH (page_reader + agent-browser for JS-heavy build.abs.xyz + curl):
+  1. build.abs.xyz/docs/abstract-portal/abstract-profile — full component spec, props, hooks, tier system; fetched the official registry JSON build.abs.xyz/r/abstract-profile.json → extracted the REAL upstream `https://backend.portal.abs.xyz/api/user/address/{addr}` (the docs only show a local proxy route)
+  2. Verified upstream live: treasury 0x60Df4E… = REAL Portal profile "Peyman24x" (tier 1, 5/5 badges, "Crypto & AI Discovery") — the owner's own profile; jarrodwatts demo profile tier 3, 19 badges
+  3. DECODED the avatar CDN pattern (improvement over official component which always falls back to static 1-1-1.png): `https://abstract-assets.abs.xyz/avatars/{season}-{tier}-{key}.png` — verified 200 on two real profiles; profile page URL `https://abs.xyz/profile/{addr}` verified 200
+  4. docs.abs.xyz/ai-agents/resources/overview — llms.txt / llms-full.txt / SKILL.MD / docs MCP + the `.md` suffix trick (any docs page as clean Markdown)
+  5. AGW overview + JSON-RPC API re-audit — round-6 alignment unchanged (provider/login/ERC-1271/eth_* only)
+- IMPLEMENTED the official Abstract Profile reusable, adapted to project standards:
+  - src/app/api/user-profile/[address]/route.ts — hardened proxy (30/min/IP rate limit, 5-min LRU cache, 15s timeout, 404/400 pass-through, viem isAddress validation)
+  - src/lib/abstract/tier-colors.ts (official Bronze→Diamond colors + FA tier names برنزی/نقره‌ای/طلایی/پلاتینی/الماس)
+  - src/lib/abstract/get-user-profile.ts (official type + improved resolveAvatarUrl + portalProfileUrl + null-for-404 fetcher)
+  - src/hooks/use-abstract-profile.ts (TanStack Query: 1-min own / 5-min others, no retry on 4xx)
+  - src/components/abstract/abstract-profile.tsx (tier ring + glow, skeleton, tooltip w/ i18n tier name, sm/md/lg, monogram fallback instead of official's misleading static avatar)
+- INTEGRATED into the product:
+  1. Wallet menu (connect-button.tsx): AbstractProfile avatar on the trigger + full identity header in dropdown (name, tier-colored tier · Portal · N badges line, "View on Portal" menu item, "No Portal profile yet — create yours at abs.xyz" hint for profile-less wallets, AGW/connected badges, PENGU balance) — w-80 menu, FA/EN
+  2. Payment dialog (payment-flow.tsx): treasury row now shows the VERIFIED receiver identity (Peyman24x PFP + name + "Verified receiver/گیرنده تأییدشده" badge) — real trust signal since payments go to that wallet; graceful address fallback if Portal unreachable
+- i18n: 8 new keys in dict.ts (en+fa): portalProfile, portalNoProfile, portalCreateHint, tier, badgesCount, viewPortal, paidToVerified
+- QA: lint clean; tsc src/ 0 errors; API E2E via curl: 200 real profile (Peyman24x tier 1, 5 badges) + x-profile-cache: hit on 2nd call + 404 no-profile + 400 invalid; browser E2E via session fixture (round-6 pattern): payment dialog treasury identity verified FA ("Peyman24x" + "گیرنده تأییدشده") and EN ("Verified receiver"); mocked-404 → correct address fallback; mock removed → profile recovers; mobile 390px no overflow; VLM visual review passed (avatar ring visible, badge legible, no layout issues); QA user cleaned from DB after testing
+- Docs: docs/ABSTRACT_PORTAL.md §8 "Abstract Profile integration" — integration table, product surfaces, verification log, and the "other build.abs.xyz capabilities reviewed" rationale (Connect/SIWE/Onboarding reusables redundant with our richer custom components; session keys still deferred; App Voting N/A)
+- Dev log clean (only pre-existing Privy/AGW SDK warnings, no page errors)
+
+Stage Summary:
+- Official Abstract Profile reusable fully integrated end-to-end (proxy → lib → hooks → component → 2 product surfaces), improved over the stock version (real avatar CDN pattern, monogram fallback, i18n, hardening)
+- Treasury identity in the payment dialog = new trust signal using the owner's real Portal profile (Peyman24x)
+- Ecosystem docs re-audit complete; all alignment documented in ABSTRACT_PORTAL.md §7+§8
+- All QA green: lint, tsc, API E2E (200/404/400/cache-hit), browser E2E FA+EN, fallback path, mobile 390px, VLM review
+- Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (main acceptance gap — needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) Wallet-dropdown interior not browser-verifiable in sandbox (AGW login can't be automated) — code shares the exact building blocks verified in the payment dialog; 4) Optional roadmap: Telegram/email alerts, backtest sandbox, session keys only if product justifies mainnet security review

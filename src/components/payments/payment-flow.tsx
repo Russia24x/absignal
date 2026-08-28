@@ -39,6 +39,9 @@ import {
   useVerifyPayment,
   type PaymentIntentResponse,
 } from '@/hooks/use-app-data'
+import { useAbstractProfileByAddress } from '@/hooks/use-abstract-profile'
+import { AbstractProfile } from '@/components/abstract/abstract-profile'
+import { getDisplayName } from '@/lib/abstract/get-user-profile'
 import { appChain, penguAddress, treasuryAddress } from '@/lib/chains'
 import { cn } from '@/lib/utils'
 
@@ -109,6 +112,12 @@ export function PaymentDialog({
   onClose: () => void
 }) {
   const { t, lang } = useI18n()
+  // Treasury identity from the Abstract Portal (verified receiver — the
+  // profile of the wallet that receives PENGU payments).
+  const { data: treasuryProfile } = useAbstractProfileByAddress(treasuryAddress)
+  const treasuryName = treasuryProfile?.user
+    ? getDisplayName(treasuryProfile.user.name, treasuryAddress)
+    : null
   const { address, chainId } = useAccount()
   const { switchChain } = useSwitchChain()
   const { writeContractAsync } = useWriteContract()
@@ -255,9 +264,21 @@ export function PaymentDialog({
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground">{t.pay.treasury}</span>
-            <span className="font-mono text-[11px] truncate max-w-[200px]" title={intent.treasuryAddress}>
-              {intent.treasuryAddress.slice(0, 10)}…{intent.treasuryAddress.slice(-8)}
-            </span>
+            {treasuryName ? (
+              <span className="flex min-w-0 items-center gap-1.5" title={intent.treasuryAddress}>
+                <AbstractProfile address={intent.treasuryAddress as `0x${string}`} size="sm" showTooltip={false} />
+                <span className="truncate text-xs font-semibold text-foreground" dir="ltr">
+                  {treasuryName}
+                </span>
+                <span className="hidden shrink-0 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300 sm:inline">
+                  {t.auth.paidToVerified}
+                </span>
+              </span>
+            ) : (
+              <span className="font-mono text-[11px] truncate max-w-[200px]" title={intent.treasuryAddress}>
+                {intent.treasuryAddress.slice(0, 10)}…{intent.treasuryAddress.slice(-8)}
+              </span>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">{t.pay.network}</span>
