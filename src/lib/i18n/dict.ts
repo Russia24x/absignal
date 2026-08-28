@@ -317,6 +317,10 @@ export const dict = {
       badgesCount: '{n} badges',
       viewPortal: 'View on Portal',
       paidToVerified: 'Verified receiver',
+      walletChecking: 'Checking wallet service…',
+      walletUnavailable: 'Wallet service unavailable',
+      walletUnavailableHint:
+        'The wallet backend (privy.abs.xyz) is unreachable from your network. Check your connection, disable blockers/VPN restrictions, then retry.',
     },
 
     // Section eyebrows (small kicker labels above headings)
@@ -667,6 +671,10 @@ export const dict = {
       badgesCount: '{n} نشان',
       viewPortal: 'مشاهده در Portal',
       paidToVerified: 'گیرنده تأییدشده',
+      walletChecking: 'بررسی سرویس کیف پول…',
+      walletUnavailable: 'سرویس کیف پول در دسترس نیست',
+      walletUnavailableHint:
+        'سرویس کیف پول (privy.abs.xyz) از شبکهٔ شما در دسترس نیست. اتصال اینترنت را بررسی کنید، مسدودسازها/محدودیت‌های شبکه را غیرفعال کنید و دوباره تلاش کنید.',
     },
 
     // Section eyebrows (small kicker labels above headings)

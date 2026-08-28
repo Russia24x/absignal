@@ -236,3 +236,39 @@ Stage Summary:
 - Ecosystem docs re-audit complete; all alignment documented in ABSTRACT_PORTAL.md §7+§8
 - All QA green: lint, tsc, API E2E (200/404/400/cache-hit), browser E2E FA+EN, fallback path, mobile 390px, VLM review
 - Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (main acceptance gap — needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) Wallet-dropdown interior not browser-verifiable in sandbox (AGW login can't be automated) — code shares the exact building blocks verified in the payment dialog; 4) Optional roadmap: Telegram/email alerts, backtest sandbox, session keys only if product justifies mainnet security review
+
+---
+Task ID: 8
+Agent: Main Agent (Z.ai Code)
+Task: Round 8 — FIX reported runtime TypeError "Failed to fetch" at AGW provider init (loadProviderDetails → privy.abs.xyz / auth.privy.io unreachable from user's network; unhandled rejection surfacing through the render tree, dead wallet stack, potential full-page crash)
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: local == remote == 925d55d, clean → proceeded
+- ROOT-CAUSE ANALYSIS:
+  1. Read agw-react@1.13.0 source: AbstractWalletProvider calls wagmi createConfig inside useMemo; the connector (xyz.abs.privy, via @privy-io/cross-app-connect) runs Privy getProvider().setup() → loadProviderDetails() → fetch of app config from https://privy.abs.xyz/api/v1/apps/cm04asygd041fmry9zmcyn5o5 + https://auth.privy.io/api/v1/apps/…/cross-app/details
+  2. Reproduced with agent-browser network route --abort on both hosts: page kept rendering (async rejection, not sync render crash) BUT the wallet stack died silently — clicking Connect did NOTHING (no modal, stuck spinner) + the unhandled "Failed to fetch" rejection is exactly the user's reported error. On stricter conditions the same error can take down the render tree (no error boundary existed) → white screen
+  3. User's network (reported from their browser) cannot reach the Privy hosts — regional/blocker network restriction. We cannot fix their network; we must degrade gracefully
+- FIX — fail-safe wallet architecture (src/components/wallet/agw-gate.tsx + providers.tsx rewrite):
+  1. Safe wagmi config (chains + transport only, connectors: [], ssr) is ALWAYS mounted → every wagmi hook keeps working without AGW; market data/signals/pricing/i18n fully browsable when the wallet backend is blocked
+  2. AgwGate: AGW is mounted ONLY after a no-cors reachability probe of both Privy hosts succeeds (8s timeout, allSettled — any HTTP status counts as reachable; only network-level failure = blocked). The failing Privy init therefore never runs on blocked networks → the reported unhandled rejection is prevented by design
+  3. AgwBoundary (React error boundary) as safety net: any AGW render crash falls back to the safe tree (page stays alive) instead of a white screen; componentDidCatch logs for diagnosis
+  4. WalletStatusContext (checking/available/unavailable + retry) shared with the UI
+- CONNECT BUTTON (connect-button.tsx) — split into gate + implementation:
+  - status checking → disabled button with spinner "Checking wallet service…" / "بررسی سرویس کیف پول…"
+  - status unavailable → outline button with WifiOff icon "Wallet service unavailable" / "سرویس کیف پول در دسترس نیست"; click = toast with actionable hint + live re-probe (no reload needed)
+  - status available → existing AgwConnectButton (useLoginWithAbstract only mounted when AGW exists — hooks rule preserved)
+  - Dead-stack guard on login(): if no Privy iframe appears within 12s (backend died AFTER the probe, e.g. network dropped mid-session) → reset spinner + toast hint instead of a stuck "Connecting…"
+- i18n: 3 new keys en+fa (walletChecking, walletUnavailable, walletUnavailableHint)
+- QA (agent-browser, all green):
+  1. Happy path unblocked: brief checking → available → click Connect → AGW modal iframe (privy.abs.xyz/apps/…/embedded-wallets) opens; login flow redirects to portal.abs.xyz cross-app connect (expected AGW behavior)
+  2. Both hosts aborted (user's condition): page fully browsable (5879 chars, market data live), button shows "Wallet service unavailable", NO crash, NO "Failed to fetch" from our app (probe prevented AGW init); click → hint toast + retry cycle → stays unavailable (correct while blocked)
+  3. Live recovery: unblock → click retry → re-probe → AGW mounts → "Connect Abstract Wallet" returns WITHOUT page reload → modal opens again
+  4. Persian unavailable state verified: "سرویس کیف پول در دسترس نیست"
+  5. Mobile 390px: no overflow; button present
+  6. lint clean, tsc src/ 0 errors, dev.log healthy
+
+Stage Summary:
+- Reported error root-caused (AGW/Privy init fetch blocked at network level) and eliminated by design: probe-before-mount prevents the failing init entirely on blocked networks
+- New resilience architecture: safe wagmi config always on + gated AGW mount + error boundary fallback → the app NEVER white-screens from wallet-stack failures, and blocked-network users get an honest actionable state with one-click live retry
+- All QA green: happy path (modal opens), blocked path (graceful degradation EN+FA), live recovery, mobile, lint/tsc
+- Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) note: users behind networks that block privy.abs.xyz/auth.privy.io will see the unavailable state until they change network — this is a network-side limitation, documented in the toast hint; 4) optional roadmap: Telegram alerts, backtest sandbox

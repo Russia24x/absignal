@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAccount, useSwitchChain, useReadContract } from 'wagmi'
 import { useLoginWithAbstract } from '@abstract-foundation/agw-react'
 import { erc20Abi, formatUnits } from 'viem'
-import { ChevronDown, Copy, ExternalLink, LogOut, Loader2, ShieldCheck, Award, UserRound } from 'lucide-react'
+import { ChevronDown, Copy, ExternalLink, LogOut, Loader2, ShieldCheck, Award, UserRound, WifiOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -28,6 +28,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { useI18n } from '@/lib/i18n/context'
 import { useWalletSignIn, useLogout, useSession } from '@/hooks/use-app-data'
+import { useWalletStatus } from '@/components/wallet/agw-gate'
 import { useAbstractProfile } from '@/hooks/use-abstract-profile'
 import { getTierName, getTierColor } from '@/lib/abstract/tier-colors'
 import { countClaimedBadges, getDisplayName, portalProfileUrl } from '@/lib/abstract/get-user-profile'
@@ -39,7 +40,47 @@ function shortAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
+/**
+ * Gate: renders the real AGW button only when the wallet backend is
+ * reachable. On blocked networks the user gets an honest, actionable
+ * state instead of a dead button — and the rest of the app keeps working
+ * (safe wagmi config from Providers).
+ */
 export function ConnectWalletButton() {
+  const { t } = useI18n()
+  const { status, retry } = useWalletStatus()
+
+  if (status !== 'available') {
+    return (
+      <Button
+        size="lg"
+        variant={status === 'checking' ? 'secondary' : 'outline'}
+        disabled={status === 'checking'}
+        aria-busy={status === 'checking'}
+        onClick={() => {
+          toast.info(t.auth.walletUnavailableHint)
+          retry()
+        }}
+        title={status === 'unavailable' ? t.auth.walletUnavailableHint : undefined}
+        className="gap-2 font-semibold"
+      >
+        {status === 'checking' ? (
+          <>
+            <Loader2 className="size-4 animate-spin" /> {t.auth.walletChecking}
+          </>
+        ) : (
+          <>
+            <WifiOff className="size-4 text-amber-400" /> {t.auth.walletUnavailable}
+          </>
+        )}
+      </Button>
+    )
+  }
+
+  return <AgwConnectButton />
+}
+
+function AgwConnectButton() {
   const { t, lang, tf, fmt } = useI18n()
   const { address, isConnected, chainId } = useAccount()
   const { login, logout: agwLogout } = useLoginWithAbstract()
@@ -83,12 +124,32 @@ export function ConnectWalletButton() {
 
   const openAgwLogin = async () => {
     setLoginOpening(true)
+    // Dead-stack guard: if the AGW backend died AFTER the gate probe
+    // (e.g. network dropped mid-session), login() hangs with no modal.
+    // Detect that after a grace period and surface an actionable hint
+    // instead of a stuck "Connecting…" spinner.
+    let deadStack = false
+    const guard = setTimeout(() => {
+      const modalPresent = document.querySelector(
+        'iframe[src*="privy"], iframe[title*="Privy" i]',
+      )
+      if (!modalPresent) {
+        deadStack = true
+        setLoginOpening(false)
+        toast.error(t.auth.walletUnavailableHint)
+      }
+    }, 12_000)
     try {
       await login()
-    } catch {
-      // User closed the AGW modal before finishing — nothing to report.
+    } catch (err) {
+      const msg = (err as Error)?.message ?? ''
+      if (/fetch|network|timeout|abort/i.test(msg)) {
+        toast.error(t.auth.walletUnavailableHint)
+      }
+      // Otherwise the user closed the AGW modal before finishing — nothing to report.
     } finally {
-      setLoginOpening(false)
+      clearTimeout(guard)
+      if (!deadStack) setLoginOpening(false)
     }
   }
 

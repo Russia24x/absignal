@@ -3,19 +3,24 @@
 /**
  * Client providers.
  *
- * Wallet connection is powered by the Abstract Global Wallet (AGW) —
- * `AbstractWalletProvider` from @abstract-foundation/agw-react wraps
- * WagmiProvider + QueryClientProvider, so every standard wagmi hook
- * (useAccount, useSignMessage, useWriteContract, …) transparently talks to
- * the user's AGW smart-account wallet.
+ * Wallet connection is powered by the Abstract Global Wallet (AGW) — but AGW
+ * is now mounted *through* `AgwGate` (see wallet/agw-gate.tsx): a "safe"
+ * wagmi config (chain + transport, no connectors, zero network at init) is
+ * ALWAYS mounted, and the real AGW provider is layered on top only when the
+ * Privy backend is reachable. If the wallet backend is blocked
+ * (privy.abs.xyz / auth.privy.io — "Failed to fetch"), the whole app still
+ * works and the connect button reports the degraded state instead of the
+ * page crashing or the wallet dying silently.
  *
  * Also hosts the i18n (fa/en) provider.
  */
 
 import { useState, type ReactNode } from 'react'
-import { QueryClient } from '@tanstack/react-query'
-import { AbstractWalletProvider } from '@abstract-foundation/agw-react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createConfig, WagmiProvider } from 'wagmi'
+import type { Chain } from 'viem'
 import { I18nProvider } from '@/lib/i18n/context'
+import { AgwGate } from '@/components/wallet/agw-gate'
 import { appChain, appChainTransport } from '@/lib/chains'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -36,10 +41,30 @@ export function Providers({ children, initialLang }: { children: ReactNode; init
       })
   )
 
+  // Safe wagmi config — always mounted, never initializes wallets or
+  // connectors: keeps every standard wagmi hook working (account state,
+  // contract reads via transport) even when the AGW/Privy backend is
+  // unreachable. AGW replaces this context for its subtree when mounted.
+  const [safeConfig] = useState(() => {
+    // Widen to `Chain` (same as the AGW SDK's own provider) so wagmi's
+    // Transports map accepts the single computed key.
+    const chain: Chain = appChain
+    return createConfig({
+      chains: [chain],
+      ssr: true,
+      connectors: [],
+      transports: { [chain.id]: appChainTransport },
+    })
+  })
+
   return (
-    <AbstractWalletProvider chain={appChain} transport={appChainTransport} queryClient={queryClient}>
-      <I18nProvider initialLang={initialLang}>{children}</I18nProvider>
-      <Toaster position="top-center" richColors theme="dark" />
-    </AbstractWalletProvider>
+    <WagmiProvider config={safeConfig}>
+      <QueryClientProvider client={queryClient}>
+        <I18nProvider initialLang={initialLang}>
+          <AgwGate queryClient={queryClient}>{children}</AgwGate>
+          <Toaster position="top-center" richColors theme="dark" />
+        </I18nProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
   )
 }
