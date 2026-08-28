@@ -380,3 +380,56 @@ Stage Summary:
 - 3 bugs caught & fixed during feature QA: alert-check effect dependency, localStorage wipe race, streak singular grammar (VLM-caught)
 - All QA green: lint, tsc, E2E EN+FA, trigger/persistence flows, mobile, VLM 9-9.5/10
 - Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) calendar navigation untestable with real multi-month data until history grows past one month (logic verified via bounded-disabled state); 4) optional roadmap: Telegram/email alerts, session keys
+
+---
+Task ID: 12
+Agent: Main Agent (Z.ai Code)
+Task: Round 12 (cron review cycle) — status assessment + agent-browser QA sweep, hero polish from VLM feedback, 4 new features (Scroll progress bar, Hero next-signal countdown pill, Live Stats Strip, FAQ search filter) + styling polish
+
+Work Log:
+- SESSION-START-SYNC-CHECK per RULES.md: local == remote == 2591577 (after dropping a stray `tool-results` commit that had a UUID subject), clean → proceeded
+- STATUS ASSESSMENT (agent-browser): page loads clean, zero console errors, all 8 sections render with real data (ticker $0.00929, 4 stat tiles, 4 oscillators, signal calendar, etc.). FA/RTL works. Mobile 390px scrollWidth = 390 (no overflow). No new bugs found → proceeded to new-feature work per cron mandate
+- VLM review of EN home: 8.5/10 with concrete actionable items — bump poweredBy contrast, strengthen primary CTA hierarchy, add countdown urgency, etc.
+- STYLING POLISH (hero.tsx):
+  • Replaced the small price glass pill with a richer `pill-status` container that includes price + 24h change + a thin vertical divider + "Next signal HH:MM:SS" countdown cell. Solves VLM-noted redundancy between hero ticker and the LivePriceTicker strip — the hero pill now anchors time-awareness alongside price.
+  • Primary CTA `Connect Wallet & Enter` wrapped in `.btn-aurora-halo` (new utility) — a soft blurred gradient halo sits behind the button, intensifying on hover. Clearly subordinates the secondary CTA.
+  • Trust badges + powered-by line tightened into one `space-y-2 pt-1` cluster (no more "staircase" gap between list and attribution).
+  • poweredBy text bumped from `text-muted-foreground/70` → `text-foreground/55` (lighter, more readable per VLM contrast ask).
+  • Countdown cell + Timer icon now carry `text-glow-pulse` (existing breathing-glow keyframe) for urgency micro-interaction — per VLM suggestion.
+- NEW FEATURE 1 — ScrollProgressBar (src/components/landing/scroll-progress.tsx):
+  • Sticky 3px strip at viewport top (z-60, above LiveTicker); `.scroll-progress` aurora gradient that animates background-position (existing aurora-shift keyframe) and scales horizontally via `transform: scaleX(progress)`.
+  • SSR-safe (renders null until mounted); hidden at scroll 0; appears on first scroll. requestAnimationFrame-throttled scroll listener (passive). Cleared on unmount.
+- NEW FEATURE 2 — Hero Next-Signal Countdown (folded into hero pill — see polish above):
+  • Reuses existing `useNextSignalCountdown` hook (HH:MM:SS to next UTC midnight). Rendered in the hero status pill with `chart-ltr` dir guard for RTL pages. Hydration-safe (returns null until mounted).
+- NEW FEATURE 3 — LiveStatsStrip (src/components/landing/live-stats-strip.tsx):
+  • Row of 4 stat tiles (Market Cap / 24h Volume / Liquidity / Buy Pressure) sitting just below the hero, before the Live Terminal section. Responsive grid 2x2 on mobile → 1x4 on lg.
+  • Each tile uses `AnimatedNumber` for count-up on scroll-into-view (existing component, respects prefers-reduced-motion).
+  • Stat values are magnitude-split (B/M/K suffix) for compact display: $583.92M / $40.87K / $457.03K / 52%.
+  • Buy Pressure tile shows percentage + green proportion bar (`stat-bar-track` + gradient fill) + raw buy/sell counts (e.g., 126/115). ARIA progressbar role + label.
+  • Loading skeleton (animated pulse) when market data unavailable — never throws or blocks render.
+  • New utilities: `.stat-tile` (glass background + hover lift) and `.stat-bar-track` (subtle track for proportion bars).
+- NEW FEATURE 4 — FAQ Search Filter (src/components/landing/faq.tsx):
+  • Live client-side filter input above the accordion. Matches both question and answer text in the current locale.
+  • "/" keyboard shortcut focuses the input (skipped when already typing in an input/textarea/contenteditable).
+  • Result count line below the input (aria-live="polite"), e.g., "1 results" or "3 results".
+  • Empty state: when no matches, shows a centered card with search icon + "No questions match your search." + a "Clear search" link.
+  • Clear (X) button replaces the keyboard hint chip when input is non-empty.
+  • Accordion remounts on query change (`key={q}`) so open state resets with filter.
+- i18n: 14 new keys en+fa (heroNextSignal, stats.{title,marketCap,volume24h,liquidity,buyPressure,buyPressureAria}, faq.{searchPlaceholder,searchAria,searchHint,resultCount,noResults,clearFilter,clear})
+- INFRA: Added `scripts/mobile-qa.ts` — CDP-based device-metrics override script for headless Chrome (agent-browser exposes no mobile viewport command on Linux). Reads the random `--remote-debugging-port` chrome picks (currently 45727 in this sandbox session). Toggles 390×844 (iPhone 12 Pro) or 1280×800 (desktop reset). Reusable for future rounds.
+- QA (agent-browser, all green):
+  1. Desktop EN: page loads, 0 console errors, scroll-progress bar appears on scroll and hides at top, hero pill shows price + countdown + divider, 4 stat tiles render with count-up + green bar on Buy Pressure, primary CTA has halo + lifts on hover
+  2. Desktop FA: same content Persian, RTL — countdown cell stays LTR via `chart-ltr` dir guard, 4 stat tiles render
+  3. Mobile 390px: scrollWidth=390 (no overflow), 4 stat tiles stack 2x2, hero pill wraps cleanly, CTA full-width on mobile
+  4. FAQ: search filters correctly (refund → 1 result, payment → 3 results, xyznotreal → empty state with clear button), "/" shortcut focuses input, EN→FA→EN language cycle clean
+  5. Console: zero errors, zero warnings from app code (only the pre-existing empty AGW/Privy probe artifact)
+  6. lint clean, tsc src/ 0 errors (pre-existing errors in scripts/, examples/, skills/ untouched)
+  7. VLM visual reviews: EN home 8.5/10, EN stats strip 9/10 ("perfectly aligned, count-up numbers readable, buy pressure 52% + green bar"), EN FAQ 9/10 ("search input visible, results filtered correctly, 1 results shown, no visual bugs")
+
+Stage Summary:
+- Status assessment: stable across rounds 1-11, no new bugs found in QA sweep → proceeded to polish + new features per cron mandate
+- 4 new user-visible features shipped: Scroll progress bar (scroll awareness), Hero next-signal countdown (urgency in the most prominent spot), Live Stats Strip (hard market numbers right after hero, count-up polish), FAQ search filter (findability + "/" shortcut)
+- Styling polish: hero pill redesigned to combine price + countdown (solving redundancy), primary CTA gets halo for stronger hierarchy, powered-by line bumped for contrast, countdown gets breathing-glow urgency, trust list + poweredBy tightened into one cluster
+- New utilities added to globals.css: `.btn-aurora-halo`, `.scroll-progress`, `.pill-status`, `.stat-tile`, `.stat-bar-track`
+- All QA green: EN+FA+mobile+lint+tsc+VLM 8.5-9/10
+- Unresolved/next-phase items (unchanged): 1) AGW payment E2E live smoke test with funded account (needs owner); 2) Cloudflare deployment (docs ready — needs owner account); 3) optional roadmap: Telegram/email alerts, session keys; 4) the previously-reported AGW `loadProviderDetails` `Failed to fetch` error is environment-specific (Preview Panel sandbox), not blocking core flows — the app gracefully renders without a wallet provider and all paid-feature gates still display correctly

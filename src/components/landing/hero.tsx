@@ -1,22 +1,29 @@
 'use client'
 
 /**
- * Hero: the big question ("buy or sell PENGU today?"), live price ticker,
- * trust badges, and the two CTAs. Framer-motion entrance, penguin mascot floating.
+ * Hero: the big question ("buy or sell PENGU today?"), live status pill
+ * (price + next-signal countdown, no longer duplicating the live ticker
+ * strip verbatim), trust badges, and the two CTAs. Framer-motion entrance,
+ * penguin mascot floating.
  */
 
 import { motion } from 'framer-motion'
-import { ArrowDownRight, ArrowUpRight, BadgeCheck, LineChart, MousePointerClick, ShieldCheck } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, BadgeCheck, LineChart, Lock, MousePointerClick, ShieldCheck, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PenguLogo } from '@/components/pengu-logo'
 import { useI18n } from '@/lib/i18n/context'
 import { useMarketOverview } from '@/hooks/use-app-data'
+import { useNextSignalCountdown } from '@/hooks/use-countdown'
 
 export function Hero() {
   const { t } = useI18n()
   const { data: market } = useMarketOverview()
   const change = market?.priceChange24h ?? null
   const positive = (change ?? 0) >= 0
+  const cd = useNextSignalCountdown()
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const countdownLabel = cd ? `${pad(cd.hours)}:${pad(cd.minutes)}:${pad(cd.seconds)}` : '––:––:––'
 
   return (
     <section id="top" className="relative pt-28 pb-14 sm:pt-36 sm:pb-20 overflow-hidden">
@@ -70,12 +77,12 @@ export function Hero() {
               {t.heroSubtitle}
             </motion.p>
 
-            {/* Live price ticker */}
+            {/* Live status pill — price + next-signal countdown in one glance */}
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="inline-flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl glass px-5 py-3.5"
+              className="inline-flex flex-wrap items-center gap-x-4 gap-y-2 pill-status rounded-2xl px-5 py-3.5"
             >
               <span className="text-xs text-muted-foreground">{t.livePrice}</span>
               <span className="flex items-center gap-2">
@@ -98,11 +105,16 @@ export function Hero() {
                   {change.toFixed(2)}%
                 </span>
               )}
-              {market?.volume24hUsd != null && (
-                <span className="text-xs text-muted-foreground font-mono">
-                  Vol: ${(market.volume24hUsd / 1000).toFixed(0)}K
+              {/* Divider */}
+              <span aria-hidden className="hidden sm:block h-6 w-px bg-primary/20" />
+              {/* Next-signal countdown */}
+              <span className="flex items-center gap-2 text-xs">
+                <Timer className="size-3.5 text-primary text-glow-pulse" />
+                <span className="text-muted-foreground">{t.heroNextSignal}</span>
+                <span className="countdown-cell rounded-md px-1.5 py-0.5 font-mono text-sm font-bold tabular-nums text-primary text-glow-pulse chart-ltr" dir="ltr">
+                  {countdownLabel}
                 </span>
-              )}
+              </span>
             </motion.div>
 
             {/* CTAs */}
@@ -112,7 +124,7 @@ export function Hero() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="flex flex-wrap items-center justify-center lg:justify-start gap-3"
             >
-              <a href="#app">
+              <a href="#app" className="btn-aurora-halo rounded-xl">
                 <Button size="lg" className="btn-aurora gap-2 font-bold text-base px-7 h-13 border-0 text-primary-foreground">
                   <MousePointerClick className="size-5" />
                   {t.heroCtaPrimary}
@@ -126,39 +138,35 @@ export function Hero() {
               </a>
             </motion.div>
 
-            {/* Trust badges */}
-            <motion.ul
+            {/* Trust badges + powered-by — tightened into a single cluster */}
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.7, delay: 0.55 }}
-              className="flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-2 text-[11px] text-muted-foreground"
+              transition={{ duration: 0.7, delay: 0.5 }}
+              className="space-y-2 pt-1"
             >
-              <li className="flex items-center gap-1.5">
-                <ShieldCheck className="size-3.5 text-bull/80" />
-                {t.trustSecurity}
-              </li>
-              <li className="flex items-center gap-1.5">
-                <BadgeCheck className="size-3.5 text-primary/80" />
-                {t.trustOnchain}
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-accent/80" />
-                {t.trustReal}
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-frost/80" />
-                {t.trustLocked}
-              </li>
-            </motion.ul>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.6 }}
-              className="text-xs text-muted-foreground/70"
-            >
-              {t.poweredBy}
-            </motion.p>
+              <ul className="flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-2 text-[11px] text-muted-foreground">
+                <li className="flex items-center gap-1.5">
+                  <ShieldCheck className="size-3.5 text-bull/80" />
+                  {t.trustSecurity}
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <BadgeCheck className="size-3.5 text-primary/80" />
+                  {t.trustOnchain}
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Lock className="size-3.5 text-frost/80" />
+                  {t.trustLocked}
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-accent/80" />
+                  {t.trustReal}
+                </li>
+              </ul>
+              <p className="text-[11px] text-foreground/55 leading-relaxed">
+                {t.poweredBy}
+              </p>
+            </motion.div>
           </div>
 
           {/* Mascot */}

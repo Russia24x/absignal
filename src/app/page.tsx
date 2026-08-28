@@ -10,6 +10,8 @@
 import { Header } from '@/components/landing/header'
 import { Hero } from '@/components/landing/hero'
 import { LivePriceTicker } from '@/components/landing/live-ticker'
+import { LiveStatsStrip } from '@/components/landing/live-stats-strip'
+import { ScrollProgressBar } from '@/components/landing/scroll-progress'
 import { TrackRecord } from '@/components/landing/track-record'
 import { BacktestSandbox } from '@/components/landing/backtest'
 import { Features } from '@/components/landing/features'
@@ -33,11 +35,13 @@ export default function Home() {
   return (
     <div dir={dir} className="relative min-h-screen flex flex-col">
       <Snowfall count={20} />
+      <ScrollProgressBar />
       <LivePriceTicker />
       <Header />
 
       <main className="relative z-10 flex-1">
         <Hero />
+        <LiveStatsStrip />
 
         {/* Live terminal */}
         <section id="app" className="relative py-10 sm:py-14">

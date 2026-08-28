@@ -30,11 +30,22 @@ export const dict = {
     heroCtaPrimary: 'Connect Wallet & Enter',
     heroCtaSecondary: 'See Track Record',
     livePrice: 'PENGU live price',
+    heroNextSignal: 'Next signal',
     poweredBy: 'Real market data · GeckoTerminal · Abstract chain',
     trustSecurity: 'Wallet login only',
     trustOnchain: 'Payments verified on-chain',
     trustReal: 'Real market data, zero simulation',
     trustLocked: 'Verdicts locked daily',
+
+    // Hero stats strip
+    stats: {
+      title: 'Market snapshot',
+      marketCap: 'Market cap',
+      volume24h: '24h volume',
+      liquidity: 'Liquidity',
+      buyPressure: 'Buy pressure',
+      buyPressureAria: 'Buy-side pressure as a share of 24h transactions',
+    },
 
     // Market
     market: {
@@ -380,6 +391,13 @@ export const dict = {
     // FAQ
     faq: {
       title: 'Frequently asked',
+      searchPlaceholder: 'Search questions…',
+      searchAria: 'Search frequently asked questions',
+      searchHint: 'Tip: press "/" to focus the search.',
+      resultCount: '{n} results',
+      noResults: 'No questions match your search.',
+      clearFilter: 'Clear search',
+      clear: 'Clear search',
       q1: 'How does the signal engine work?',
       a1: 'Every day the engine pulls real OHLCV candles for the deepest PENGU pool on Abstract, computes eight classic indicators on four timeframes (15m, 1h, 4h, 1d), and combines their votes with transparent weights into a single composite score from -100 to +100. The score maps to a verdict: STRONG SELL to STRONG BUY.',
       q2: 'How do payments work?',
@@ -516,11 +534,22 @@ export const dict = {
     heroCtaPrimary: 'اتصال کیف پول و ورود',
     heroCtaSecondary: 'مشاهده عملکرد واقعی',
     livePrice: 'قیمت لحظه‌ای پنگو',
+    heroNextSignal: 'سیگنال بعدی',
     poweredBy: 'داده‌های واقعی بازار · GeckoTerminal · زنجیره Abstract',
     trustSecurity: 'فقط ورود با کیف پول',
     trustOnchain: 'تأیید پرداخت روی زنجیره',
     trustReal: 'داده واقعی بازار، بدون شبیه‌سازی',
     trustLocked: 'قفل روزانه سیگنال‌ها',
+
+    // Hero stats strip
+    stats: {
+      title: 'نگاه کلی بازار',
+      marketCap: 'ارزش بازار',
+      volume24h: 'حجم ۲۴ساعته',
+      liquidity: 'نقدینگی',
+      buyPressure: 'فشار خرید',
+      buyPressureAria: 'سهم خرید از کل تراکنش‌های ۲۴ ساعته',
+    },
 
     market: {
       title: 'ترمینال زنده',
@@ -858,6 +887,13 @@ export const dict = {
 
     faq: {
       title: 'سؤالات متداول',
+      searchPlaceholder: 'جستجوی سؤالات…',
+      searchAria: 'جستجوی سؤالات متداول',
+      searchHint: 'نکته: کلید «/» را برای تمرکز روی جستجو بزنید.',
+      resultCount: '{n} نتیجه',
+      noResults: 'هیچ سؤالی با جستجوی شما همخوانی ندارد.',
+      clearFilter: 'پاک کردن جستجو',
+      clear: 'پاک کردن جستجو',
       q1: 'موتور سیگنال چطور کار می‌کند؟',
       a1: 'هر روز موتور کندل‌های واقعی OHLCV عمیق‌ترین استخر PENGU روی Abstract را می‌گیرد، هشت اندیکاتور کلاسیک را روی چهار تایم‌فریم (۱۵دقیقه، ۱ساعته، ۴ساعته، روزانه) محاسبه می‌کند و رأی‌ها را با وزن‌های شفاف در یک امتیاز مرکب از ‎-۱۰۰ تا ‎+۱۰۰ ترکیب می‌کند. امتیاز به سیگنال «فروش قوی» تا «خرید قوی» تبدیل می‌شود.',
       q2: 'پرداخت چطور انجام می‌شود؟',
