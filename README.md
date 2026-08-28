@@ -153,7 +153,7 @@ token address — see [docs/TESTNET.md](docs/TESTNET.md).
 ```bash
 bun scripts/e2e-auth.ts   # 22-check backend security suite (auth, paywall, payments)
 bun run lint              # ESLint
-bunx tsc --noEmit         # type check
+bun run typecheck         # TypeScript (strict, app + scripts)
 ```
 
 The E2E suite generates a throwaway wallet and exercises the real flow end-to-end:
@@ -171,15 +171,18 @@ bun scripts/qa-freesession.ts                                      # logged in, 
 
 ## Deployment
 
-> **⛔ ON HOLD (Round 17):** deployment is intentionally paused pending owner
-> review of the audit pass and the rebalanced tariff. No CI/CD pipeline exists,
-> so nothing can deploy automatically. See the banner in
-> [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+> **✅ GO (Round 19):** the deployment hold is lifted — the repo is
+> production-clean (typecheck/lint/e2e 22/22 green, no dead code or unused
+> dependencies). Full step-by-step guides live in
+> [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md):
+>
+> - **Path A — manual** Wrangler CLI deploy to Cloudflare Workers
+> - **Path B — `dash.cloudflare.com` + GitHub**: connect the repo once,
+>   every push to `main` builds & deploys automatically (Workers Builds)
+> - **Path C — self-hosted** standalone Node build (`npm run build && npm run start`)
 
-Full guides live in [`docs/`](docs/):
+Related guides:
 
-- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** — Cloudflare free tier (Workers + D1/Turso),
-  including domain setup and zero-cost scaling notes.
 - **[ABSTRACT_PORTAL.md](docs/ABSTRACT_PORTAL.md)** — registering on portal.abs.xyz,
   creating your wallet, and funding the treasury.
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** — modules, data flow, security model,

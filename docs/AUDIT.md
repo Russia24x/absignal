@@ -81,16 +81,18 @@ gracefully degraded.
 | OOM posture | `NODE_OPTIONS=--max-old-space-size=1536` in dev script; RSS stable | ✅ |
 | Server persistence | Double-fork orphan start pattern; survives tool-command teardown | ✅ |
 
-## 5. Deployment Audit — **HALTED**
+## 5. Deployment Audit — hold **LIFTED** (Round 19)
 
-- **State: intentionally stopped** (owner decision, Round 17). Banner added at
-  the top of `docs/DEPLOYMENT.md` and in the README Deployment section.
-- Verified **no CI/CD pipelines exist** (`.github/workflows` absent), **no
-  deploy configs** (`vercel.json`, `wrangler.toml`, `netlify.toml` absent),
-  and no deploy scripts in `package.json`. Nothing can deploy automatically.
-- The app continues to run only as the local sandbox dev server (port 3000).
-- Lift conditions (owner's call): review of this audit + acceptance of the
-  rebalanced tariff; then follow `docs/DEPLOYMENT.md`.
+- **Round-17 state:** intentionally stopped (owner decision). Verified at the
+  time: no CI/CD pipelines (`.github/workflows` absent), no deploy configs,
+  no deploy scripts — nothing could deploy automatically.
+- **Round 19:** owner lifted the hold; deployment preparation is the active
+  phase. `docs/DEPLOYMENT.md` now carries the full go-live runbook
+  (manual Wrangler deploy + `dash.cloudflare.com` GitHub-connected
+  auto-deploy + self-hosted standalone path).
+- Still true: no CI/CD pipeline exists in-repo (deliberate — Cloudflare
+  Workers Builds is the intended pipeline, configured in the dashboard,
+  not in the repo).
 
 ## Findings Register
 

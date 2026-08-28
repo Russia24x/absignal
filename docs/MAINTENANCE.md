@@ -88,8 +88,9 @@ sqlite3 db/custom.db "SELECT date, verdict, score, confidence FROM DailySignal O
 
 ## Release checklist
 
-1. `bunx tsc --noEmit` → clean
+1. `bun run typecheck` → clean
 2. `bun run lint` → clean
 3. `bun scripts/e2e-auth.ts` → 22 ✅
 4. Manual browser pass: connect → sign → buy a plan → signal renders → language toggle → mobile width
 5. `GET /api/config` on the deployed host → `configOk: true`
+6. Deploy via [docs/DEPLOYMENT.md](DEPLOYMENT.md) (manual Wrangler or Workers Builds — both covered) and run its §6 post-deploy verification

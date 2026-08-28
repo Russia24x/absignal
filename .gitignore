@@ -30,33 +30,32 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — secrets never committed (.env.example is the template)
 .env*
 !.env.example
 
 # vercel
 .vercel
 
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# logs & local artifacts
 local-*
+*.log
+server.log
+
+# local tooling
 .claude
 .z-ai-config
-*.log
-dev.log
-dev.out.log
 test
 prompt
 
-server.log
-# Skills directory
+# Skills directory (sandbox tooling, not part of the app)
 /skills/
 
 # ── secrets & local databases — NEVER commit ──
-.env*
-!.env.example
 /db/
 *.db
 *.db-journal
