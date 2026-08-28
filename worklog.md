@@ -921,3 +921,16 @@ Stage Summary:
 - Every markdown file in the repo is now production-current and consistent with the code: engine v2 mechanics, versioned/backfilled track record, 34-check e2e, minimal 5-section UI, current project structure, current module map, current ops/troubleshooting knowledge (incl. the stale-Prisma-client restart lesson).
 - Docs-only round — zero code changes, zero risk to behavior; all gates re-verified green anyway.
 - Remaining for the OWNER (unchanged, environmental): fund the treasury; live funded-wallet payment smoke test from a real network (sandbox blocks privy.abs.xyz); optional paymaster for 0-gas UX.
+---
+Task ID: 27-b
+Agent: orchestrator (main)
+Task: Owner question (Persian) — "what is this: ⛔ DEPLOYMENT ON HOLD (owner decision — Round 17, 2026-08-28)?"
+
+Work Log:
+- LOCATED the string: it exists ONLY in git history — the Round-17 version of docs/DEPLOYMENT.md (commit f47a124), where the hold banner topped the deployment guide. The current file says "✅ Status: GO (owner decision — Round 19, 2026-08-29; current as of R27)".
+- EXPLAINED to the owner (Persian): Round 17 = full code audit requested → deployment intentionally frozen so nothing could go live unaudited; audit PASSED (A-1/A-2 fixed in-code); Round 19 = owner lifted the hold; status today is GO everywhere (DEPLOYMENT.md header, README, AUDIT.md §5).
+- CLARITY FIX: docs/AUDIT.md header's historical "deployment halted" line now carries an inline parenthetical — hold lifted in Round 19 (§5), today GO, and the ⛔ banner lives only in git history — so no future reader can mistake history for current status.
+- Git: docs-only micro-commit, pushed (no force, per Rule 1).
+
+Stage Summary:
+- Owner's question answered: the ⛔ banner is a defunct Round-17 safety freeze, replaced by ✅ GO in Round 19; the only place it still appears is old git commits, and AUDIT.md now says so explicitly at the top.

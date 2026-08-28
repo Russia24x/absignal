@@ -3,7 +3,11 @@
 > Scope: every file under `src/`, `prisma/`, `scripts/`, plus runtime behavior
 > of the running dev server. Triggered by the owner: full audit of
 > architecture, core, security, execution — **deployment halted** during and
-> after the audit until explicitly lifted.
+> after the audit until explicitly lifted. *(The hold was lifted by the owner
+> in Round 19 — see §5. Deployment status today: **GO** —
+> [DEPLOYMENT.md](DEPLOYMENT.md). The ⛔ "DEPLOYMENT ON HOLD" banner that
+> used to top this repo's deployment guide lives only in git history from
+> Round 17.)*
 >
 > ⛔ UPDATE (R23): the automated 15-minute review cycle was later
 > **permanently removed by owner directive** — no scheduled development
