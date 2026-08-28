@@ -6,9 +6,11 @@ This document explains the system end-to-end so future developers can extend it 
 ```
 ┌──────────────────────────────── Browser ────────────────────────────────┐
 │  React 19 + Abstract Global Wallet (AGW) via @abstract-foundation/agw-react │
-│  ├── Landing (public): hero · live price · track record · pricing · FAQ │
-│  └── Terminal: market cards · candlestick chart (lightweight-charts)    │
-│        └── Signal card (entitlement ladder → payment dialog)            │
+│  ├── Single page, 5 sections: hero (+mascot) · terminal ·                │
+│  │   performance · pricing · FAQ                                          │
+│  │     ├── Terminal: signal card + tabs (chart / alerts / risk calc)      │
+│  │     └── Performance: tabs (track record / backtest)                    │
+│  └── BuyPlanButton ladder → payment dialog (entitlement-gated)            │
 └──────────────┬───────────────────────────────────────────┬──────────────┘
                │ fetch (same-origin, httpOnly cookie)      │ wallet tx (PENGU transfer)
                ▼                                           ▼
@@ -17,7 +19,9 @@ This document explains the system end-to-end so future developers can extend it 
 │  /api/auth/*    nonce/verify│                │  PENGU ERC-20 transfers   │
 │  /api/market/*  cached data │──verify tx──▶  │  → treasury wallet        │
 │  /api/signal/*  paywalled   │                └───────────────────────────┘
+│  /api/backtest  replay      │
 │  /api/payments/* intent     │
+│  /api/user-profile portal   │
 └──────┬──────────┬───────────┘
        ▼          ▼
 ┌────────────┐ ┌──────────────────────────┐
@@ -27,6 +31,7 @@ This document explains the system end-to-end so future developers can extend it 
 │ nonces,    │ └──────────────────────────┘
 │ intents,   │
 │ signals    │
+│ (versioned)│
 └────────────┘
 ```
 
@@ -38,12 +43,16 @@ This document explains the system end-to-end so future developers can extend it 
 | `src/lib/chains.ts` | Client-side viem chain definitions (Abstract 2741 / Testnet 11124). |
 | `src/lib/market/geckoterminal.ts` | Market data client with in-memory TTL cache (respects the free tier's ~30 req/min). |
 | `src/lib/analysis/indicators.ts` | Pure, deterministic indicator math (EMA, SMA, RSI-Wilder, MACD, Bollinger, Stochastic, ATR, ADX/DI, OBV slope, ROC, swing levels). |
-| `src/lib/analysis/engine.ts` | Multi-timeframe scoring: per-TF indicator votes → weighted score → verdict + confidence + ATR-based trade plan. Weights are constants at the top of the file. |
-| `src/lib/signal/daily.ts` | The product logic: lock one verdict per UTC day, expose history, score outcomes against real next-day closes, backfill from historical candles. |
+| `src/lib/analysis/engine.ts` | **Engine v2 (regime-aware)**: ADX picks the per-timeframe weight table (trend / balanced / mean-revert), a chase dampener scales momentum votes when price is stretched from EMA20 (with a fresh-breakout exemption), verdict thresholds scale with ATR%. Produces verdict + confidence + ATR-based trade plan. `ENGINE_VERSION` is stamped on every lock. |
+| `src/lib/signal/daily.ts` | The product logic: lock one verdict per UTC day (stamped with `engine` version), expose history, score outcomes against real next-day closes, backfill from historical candles (`backfilled: true` on reconstructed rows). |
+| `src/lib/backtest/replay.ts` | Walk-forward replay over historical candles — the public Backtest tab and `/api/backtest`. |
 | `src/lib/auth/session.ts` | Nonces (single-use, expiring, exact-message storage), sessions (random secret + HMAC cookie + SHA-256 at rest). |
 | `src/lib/payments/onchain.ts` | On-chain payment verification via `eth_getTransactionReceipt` + ERC-20 Transfer log decoding. Amounts come from `subscriptionPackages` (`src/lib/config.ts`) resolved server-side from a `planId` — the client never names a price. |
 | `src/lib/rate-limit.ts` | In-memory sliding-window limiter used by every public route. |
+| `src/lib/abstract/` | Portal identity (`get-user-profile.ts` + tier colors), optimistic tx submission (`optimistic-tx.ts`), upvote voting contract (`voting-contract.ts`). |
 | `src/hooks/use-app-data.ts` | All TanStack Query hooks + the wallet sign-in mutation. |
+| `src/hooks/use-agw-login.ts` | The shared AGW login ladder (embedded-browser warning + dead-stack guard) behind the connect button and BuyPlanButton. |
+| `src/components/payments/buy-plan-button.tsx` | Owns the whole purchase ladder: wallet-backend check → AGW login → SIWE sign-in → payment intent + dialog (remembered pending plan auto-opens). |
 | `src/lib/i18n/` | `dict.ts` (fa/en), `context.tsx` (provider, cookie persistence, dir switching). |
 
 ## Security model (priority #1, #2 and #3)
@@ -70,15 +79,25 @@ This document explains the system end-to-end so future developers can extend it 
 
 ```
 00:00 UTC ─ first request of the day
-            └─ engine pulls fresh candles (15m/1h/4h/1d, only CLOSED candles)
-            └─ composite score → verdict → persisted to DailySignal (immutable for the day)
+            └─ engine v2 pulls fresh candles (15m/1h/4h/1d, only CLOSED candles)
+            └─ regime-aware composite score → verdict → persisted to DailySignal
+               (immutable for the day, stamped with engine: 'v2')
    …users with an active plan (day/week/month/year/lifetime) → /api/signal/today returns the locked row
 next day  ─ history scorer compares verdict direction vs real next-day close → WIN/LOSS/NEUTRAL
 ```
 
 Backfill: on the first-ever `/api/signal/history` call, the engine replays its scoring
 over the last ~21 days of real daily candles, so the public track record is genuine
-market data from day one (each historical row stores `invalidation: "historical"`).
+market data from day one. Reconstructed rows carry `backfilled: true` — the UI marks
+them with a ◆ symbol and a bilingual disclosure footnote, so pre-launch
+reconstruction is public, never hidden.
+
+**Engine versioning (R26).** Every `DailySignal` row stores the engine generation
+that produced it (`engine: 'v1' | 'v2' | …`). When the engine changes, the version
+is bumped — existing rows are NEVER rewritten. The track record UI shows a `v2`
+chip on v2 rows plus a permanent bilingual disclosure explaining why v1 failed
+(48% lagging trend weight on a mean-reverting asset) and that failures are
+published, not hidden. This turns engine upgrades into visible, auditable events.
 
 ## Payments & crediting (v2 tariff)
 
@@ -112,7 +131,15 @@ market data from day one (each historical row stores `invalidation: "historical"
 1. Implement it as a pure function in `indicators.ts` (candles in → value out).
 2. In `engine.ts → analyzeTimeframe`, compute it, derive a vote
    (`bullish | bearish | neutral`) and a 0–1 strength, then `push(...)` with a weight.
-3. Keep `INDICATOR_WEIGHTS` summing to 1 and document the reasoning in the PR.
+3. Add the weight to **all three regime tables** (`WEIGHTS.trend`, `WEIGHTS.balanced`,
+   `WEIGHTS.meanRevert` in `engine.ts`) — each must keep summing to 1. Decide whether
+   the new voter belongs in `DAMPABLE` (momentum-chasing voters subject to the chase
+   dampener).
+4. **Bump `ENGINE_VERSION`** (e.g. `v2` → `v3`) — locked history stays stamped with
+   the generation that produced it.
+5. Validate the change with `bun run scripts/engine-v2-validation.ts` (walk-forward
+   A/B on real candles: accuracy, paper equity, actionable days, plan replay in R).
+   Document the reasoning in the PR/commit.
 
 ## Data flow guarantees
 

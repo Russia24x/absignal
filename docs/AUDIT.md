@@ -8,6 +8,18 @@
 > ⛔ UPDATE (R23): the automated 15-minute review cycle was later
 > **permanently removed by owner directive** — no scheduled development
 > review runs anymore.
+>
+> ✅ UPDATE (R27, current): this audit's conclusions still hold. Changes
+> since R17, all gated green at each round: **R22** removed fake sections
+> (HolderPerks, Snowfall) and wired direct purchase from pricing cards;
+> **R23** extended the e2e suite 22 → 34 checks (subscription lifecycle +
+> anti-tampering) — all pass; **R24** flattened the UI to a minimal
+> 5-section single page (−2,798 lines, no functional loss); **R25** made the
+> track record provably transparent (`backfilled` flag + ◆ disclosure);
+> **R26** shipped engine v2 (regime-aware weights, chase dampener,
+> volatility-scaled verdicts) validated walk-forward, with a versioned track
+> record. Current gates: `tsc` 0 errors · lint clean · e2e 34/34 · browser
+> QA (EN/FA/RTL/mobile) console-error-free.
 
 **Verdict: PASS with 2 security fixes applied during the audit (A-1, A-2)
 and 1 correctness guard added (A-4). No blocking findings remain.**

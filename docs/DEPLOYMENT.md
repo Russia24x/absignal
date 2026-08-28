@@ -1,10 +1,11 @@
 # Deployment Guide — Cloudflare (free tier)
 
-> **✅ Status: GO** (owner decision — Round 19, 2026-08-29).
+> **✅ Status: GO** (owner decision — Round 19, 2026-08-29; current as of R27).
 > The Round-17 deployment hold is **lifted**. The audit pass
 > (`docs/AUDIT.md`) is complete (2 medium findings fixed in-code), the
 > Round-17 staircase tariff is validated, and the repo is production-clean
-> (typecheck, lint, e2e 22/22 all green).
+> (typecheck, lint, e2e 34/34 all green; engine v2 walk-forward-validated
+> in R26; full minimal UI redesign in R24).
 >
 > This guide covers **three paths**, pick one:
 >
@@ -22,7 +23,7 @@
 |---|---|
 | `bun run typecheck` | 0 errors |
 | `bun run lint` | clean |
-| `bun scripts/e2e-auth.ts` | 22/22 pass (auth ladder, paywall, no-leak, exact wei amounts) |
+| `bun scripts/e2e-auth.ts` | 34/34 pass (auth ladder, paywall, no-leak, exact wei amounts, subscription lifecycle, anti-tampering) |
 | Secrets in git | none — `.env` untracked, `.env.example` carries placeholders only |
 | `SESSION_SECRET` | generate a fresh one for production: `openssl rand -hex 32` |
 | Treasury address | `0x60Df4E186364c3a49A550Aee29Da1d5fe3658818` — confirm you control it (see `docs/ABSTRACT_PORTAL.md`) before going live |
@@ -355,10 +356,12 @@ Run these **against the live URL** before announcing anything:
 1. `GET https://<domain>/api/config` → `"configOk": true`, correct
    treasury + PENGU addresses, the 5 plan prices.
 2. `GET /api/signal/history` → rows appear (first call backfills from real
-   candles).
+   candles; each row carries its engine version — `v1` for the pre-launch
+   reconstruction window, `v2` from the first live lock after the upgrade).
 3. `GET /api/market/overview` → live PENGU price (~$0.009 range).
 4. Open the site in a browser: Persian RTL renders by default, language
-   toggle flips to English, all 12 sections render, zero console errors.
+   toggle flips to English, all 5 sections render (hero, terminal,
+   performance, pricing, FAQ), zero console errors.
 5. Connect a wallet → signature prompt → session cookie set
    (`/api/auth/me` returns your address).
 6. Create a plan intent (e.g. `day`) → send 10 PENGU from a funded wallet →

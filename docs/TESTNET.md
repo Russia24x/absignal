@@ -37,8 +37,8 @@ curl http://localhost:3000/api/config | jq .networkMode   # → "testnet"
 
 In the UI:
 
-- The header badge shows **Abstract Testnet**.
-- Payment dialogs expect chain `11124` (wrong-network switching targets testnet).
+- Payment dialogs show **Abstract Testnet** as the expected chain
+  (wrong-network switching targets chain `11124`).
 - The whole ladder works: connect → sign (free) → buy any plan with test tokens —
   with on-chain verification running against the testnet RPC.
 

@@ -3,7 +3,8 @@
 **Daily BUY / SELL signals for PENGU — built on the [Abstract](https://abs.xyz) blockchain.**
 
 PenguSignal reads the real PENGU market every day (live DEX data on Abstract), runs a
-multi-timeframe technical-analysis engine (RSI, MACD, EMA, Bollinger, Stochastic, ADX, OBV, ATR),
+regime-aware multi-timeframe technical-analysis engine **v2** (RSI, MACD, EMA,
+Bollinger, Stochastic, ADX, OBV, ATR — weights switch with the market regime),
 and locks a clear daily verdict — with entry zone, stop-loss and targets.
 
 Registration is **free**: connect an Abstract wallet, sign once, and browse the market
@@ -12,8 +13,9 @@ PENGU plan — from a single day to lifetime. Payments are plain PENGU transfers
 treasury wallet, verified directly against Abstract block data.
 
 - 🇮🇷 Persian (RTL) & English (LTR) UI — switch from the header
-- 📊 Live terminal: price, volume, liquidity, candlestick chart (15m/1h/4h/1d)
-- 🔒 Locked daily verdicts + a **public, honestly-scored track record**
+- 📊 Live terminal: signal card + candlestick chart (15m/1h/4h/1d), price alerts, risk calculator
+- 📈 Performance: public track record + walk-forward backtest replay
+- 🔒 Locked daily verdicts + a **public, honestly-scored, engine-versioned track record**
 - 🛡️ Security-first: signature login, single-use nonces, server-side entitlements, on-chain payment verification
 
 > ⚠️ Educational technical analysis — not financial advice.
@@ -55,22 +57,38 @@ both EOAs and smart accounts (ERC-1271 / ERC-6492).
 
 ## How it works
 
-### The analysis engine (`src/lib/analysis/`)
+### The analysis engine v2 (`src/lib/analysis/`)
 
 1. **Data** — OHLCV candles (USD-denominated) for the deepest PENGU pool on Abstract
    stream from the free [GeckoTerminal API](https://www.geckoterminal.com/dex-api) (no key
-   needed). Prices, volume and liquidity come from the same source.
-2. **Indicators** — 8 classic indicators vote on **4 timeframes** (15m, 1h, 4h, 1d)
-   with transparent weights (`engine.ts`):
-   EMA20/50 cross (0.18), MACD (0.16), EMA200 trend (0.14), RSI-14 (0.14),
-   Bollinger %B (0.10), Stochastic (0.10), OBV slope (0.09), ROC (0.09).
-3. **Composite** — timeframe scores are weighted (1d 0.40 / 4h 0.30 / 1h 0.20 / 15m 0.10)
+   needed). Prices, volume and liquidity come from the same source. Only **closed**
+   candles are ever used (no look-ahead).
+2. **Indicators** — 8 classic indicators vote on **4 timeframes** (15m, 1h, 4h, 1d):
+   EMA20/50 cross, MACD, EMA200 trend, RSI-14, Bollinger %B, Stochastic, OBV slope, ROC.
+3. **Regime-aware weights** — ADX picks the weight table per timeframe: chop (ADX < 20)
+   leans on mean-reversion voters (RSI/Bollinger/Stochastic), trend (ADX ≥ 25) on trend
+   voters, in between is balanced. This was the core v2 fix — v1's fixed trend-heavy
+   weights systematically sold bottoms and bought tops on this mean-reverting asset.
+4. **Chase dampener** — when price is stretched > 1.5–2.5 ATR from EMA20, trend votes
+   in the stretch direction are scaled down (floor 0.25–0.5 by regime) so the engine no
+   longer buys blow-off tops or sells capitulation bottoms. Fresh 20-candle
+   breakouts/breakdowns are exempt (momentum must not be faded at breakout).
+5. **Volatility-scaled verdicts** — BUY/SELL thresholds scale with ATR% (×0.8–1.6);
+   in high-volatility regimes weak conviction becomes HOLD instead of a coin-flip call.
+6. **Composite** — timeframe scores are weighted (1d 0.40 / 4h 0.30 / 1h 0.20 / 15m 0.10)
    into a −100…+100 score → verdict: STRONG_SELL · SELL · HOLD · BUY · STRONG_BUY.
-4. **Risk plan** — entry zone, stop-loss and 3 targets derive from the daily ATR
+7. **Risk plan** — entry zone, stop-loss and 3 targets derive from the daily ATR
    (1.5×ATR risk, 1R/2R/3R targets).
-5. **Lock & score** — the verdict is computed once per UTC day and stored immutably.
-   Past days are later scored against the real next-day close — the public
-   **track record** is therefore genuinely data-driven.
+8. **Lock & score** — the verdict is computed once per UTC day, stamped with the
+   engine version (`ENGINE_VERSION`, currently `v2`) and stored immutably. Past days
+   are later scored against the real next-day close — the public **track record** is
+   therefore genuinely data-driven.
+
+> **Versioned track record.** Each history row carries its engine version (shown as a
+> `v2` chip in the UI) and a `backfilled` marker (◆) for pre-launch walk-forward
+> reconstruction days — engine upgrades are visible, history is never silently
+> rewritten. The first 21 days are v1 reconstructions on real candles, disclosed in
+> both EN and FA.
 
 ### Payments & access (`src/lib/payments/onchain.ts`)
 
@@ -151,15 +169,25 @@ token address — see [docs/TESTNET.md](docs/TESTNET.md).
 ## Testing
 
 ```bash
-bun scripts/e2e-auth.ts   # 22-check backend security suite (auth, paywall, payments)
+bun scripts/e2e-auth.ts   # 34-check backend security suite (auth, paywall, payments,
+                           # subscription lifecycle, anti-tampering)
 bun run lint              # ESLint
 bun run typecheck         # TypeScript (strict, app + scripts)
 ```
 
 The E2E suite generates a throwaway wallet and exercises the real flow end-to-end:
 nonce issuance, signature verification, replay/forgery rejection, session lifecycle,
-the entitlement ladder, plan-based payment intents (exact amounts), and on-chain
-rejection of fake transactions.
+the entitlement ladder, plan-based payment intents (exact amounts), on-chain
+rejection of fake transactions, subscription expiry/renewal stacking, and
+client-tampering resistance (forged cookies, swapped secrets, price spoofing).
+
+Engine changes are validated against real historical candles — the script
+replays 119 days walk-forward (strict no-look-ahead, v1 cloned inline) and
+A/B-compares old vs new engine on accuracy, paper equity and actionable days:
+
+```bash
+bun run scripts/engine-v2-validation.ts   # walk-forward A/B of engine changes
+```
 
 UI fixtures (dev only — create a session via the real auth flow and print the cookie
 for browser injection):
@@ -167,13 +195,15 @@ for browser injection):
 ```bash
 bun scripts/qa-subscription-fixture.ts [expiring|active|lifetime]  # subscribed session
 bun scripts/qa-freesession.ts                                      # logged in, no subscription
+bun scripts/mobile-qa.ts                                           # 390px viewport QA
 ```
 
 ## Deployment
 
 > **✅ GO (Round 19):** the deployment hold is lifted — the repo is
-> production-clean (typecheck/lint/e2e 22/22 green, no dead code or unused
-> dependencies). Full step-by-step guides live in
+> production-clean (typecheck/lint/e2e 34/34 green, no dead code or unused
+> dependencies; engine v2 validated walk-forward in R26). Full step-by-step
+> guides live in
 > [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md):
 >
 > - **Path A — manual** Wrangler CLI deploy to Cloudflare Workers
@@ -190,40 +220,51 @@ Related guides:
 
 ## Project structure
 
+The product is a **minimal 5-section single page**: hero → live terminal
+(signal card + chart/alerts/risk tabs) → performance (track record + backtest
+tabs) → pricing → FAQ, with a sticky footer.
+
 ```
 src/
 ├── app/
 │   ├── page.tsx              # the single-page app (landing + terminal)
 │   └── api/
 │       ├── auth/             # nonce / verify / logout / me
+│       ├── backtest/         # walk-forward replay (public)
 │       ├── market/           # overview / candles (cached proxy)
-│       ├── signal/           # today (paywalled) / history (public)
-│       └── payments/         # intent / on-chain verify
+│       ├── signal/           # today (paywalled) / history (public) / detail
+│       ├── payments/         # intent / on-chain verify
+│       └── user-profile/     # Abstract Portal identity proxy
 ├── components/
-│   ├── landing/              # hero, features, pricing, FAQ, track record…
-│   ├── market/               # overview cards, candlestick chart
-│   ├── signal/               # the gated signal card
-│   ├── payments/             # payment dialog flow
-│   └── wallet/               # connect button + auto sign-in
-├── hooks/                    # TanStack Query hooks (server state)
+│   ├── landing/              # hero (+ mascot), terminal, performance, pricing,
+│   │                         # track record, backtest, risk calc, FAQ, header/footer
+│   ├── market/               # candlestick chart, price alerts
+│   ├── signal/               # the gated signal card + detail dialog
+│   ├── payments/             # BuyPlanButton ladder + payment dialog flow
+│   ├── wallet/               # AGW gate, connect button + auto sign-in
+│   └── abstract/             # Portal profile + upvote voting button
+├── hooks/                    # TanStack Query hooks + AGW login ladder
 └── lib/
-    ├── analysis/             # indicators + multi-TF engine
+    ├── analysis/             # indicators + regime-aware engine v2
     ├── auth/                 # nonces, sessions
+    ├── backtest/             # walk-forward replay engine
     ├── i18n/                 # fa/en dictionaries + context
     ├── market/               # GeckoTerminal client + cache
     ├── payments/             # on-chain verification
-    └── signal/               # daily lock + track record + backfill
+    ├── signal/               # daily lock + track record + backfill
+    └── abstract/             # Portal profile, optimistic tx, voting contract
 ```
 
 ## Documentation
 
 | Doc | What's inside |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, security model, engine internals, how to extend |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, security model, engine v2 internals, how to extend |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Cloudflare free-tier deployment, envs, DB migration path |
 | [docs/ABSTRACT_PORTAL.md](docs/ABSTRACT_PORTAL.md) | portal.abs.xyz registration & wallet setup walkthrough |
 | [docs/TESTNET.md](docs/TESTNET.md) | running against Abstract Testnet |
-| [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | operations, monitoring, common tasks, troubleshooting |
+| [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | operations, monitoring, engine tuning, common tasks, troubleshooting |
+| [docs/AUDIT.md](docs/AUDIT.md) | full code audit history (R17) + current status |
 
 ---
 
