@@ -243,6 +243,14 @@ export function TrackRecord() {
                                 </Tooltip>
                               </TooltipProvider>
                             )}
+                            {e.engine === 'v2' && (
+                              <span
+                                className="ms-1.5 inline-flex rounded border border-primary/25 bg-primary/10 px-1 py-px align-middle text-[9px] font-bold leading-none text-primary"
+                                title={t.track.engineNote}
+                              >
+                                v2
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell>{verdictBadge(e.verdict, t.signal.verdicts as Record<string, string>)}</TableCell>
                           <TableCell
@@ -313,6 +321,11 @@ export function TrackRecord() {
               <span>{t.track.backfilledNote}</span>
             </p>
           )}
+          {/* Engine upgrade disclosure — the honest answer to "why did v1 fail?" */}
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/80 flex items-start gap-1.5">
+            <span className="mt-px inline-flex shrink-0 rounded border border-primary/25 bg-primary/10 px-1 text-[9px] font-bold leading-[14px] text-primary" aria-hidden>v2</span>
+            <span>{t.track.engineNote}</span>
+          </p>
         </motion.div>
 
       <SignalDetailDialog date={detailDate} onOpenChange={(open) => !open && setDetailDate(null)} />

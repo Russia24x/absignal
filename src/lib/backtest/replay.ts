@@ -23,7 +23,7 @@
  * honestly in the UI ("1D engine replay").
  */
 
-import { analyzeTimeframe, verdictFromScore, type Verdict } from '@/lib/analysis/engine'
+import { analyzeTimeframe, verdictFromScore, volatilityScale, type Verdict } from '@/lib/analysis/engine'
 import { atr } from '@/lib/analysis/indicators'
 import type { Candle } from '@/lib/market/geckoterminal'
 
@@ -171,13 +171,14 @@ export function runBacktest(allCandles: Candle[]): BacktestResult | null {
     // drops the last one — same as live where today's candle is dropped).
     const visible = closed.slice(0, i + 1)
     const tf = analyzeTimeframe('1d', visible)
-    const verdict = verdictFromScore(tf.score)
+    const ref = closed[i - 1].close
+    const atrValue = atr(closed.slice(0, i), 14) ?? ref * 0.04
+    const volScale = volatilityScale(atrValue != null && ref > 0 ? (atrValue / ref) * 100 : null)
+    const verdict = verdictFromScore(tf.score, volScale)
     const side = actionable(verdict)
     if (!side) continue
 
     // Plan math mirrors buildPlan() with price = close of D-1.
-    const ref = closed[i - 1].close
-    const atrValue = atr(closed.slice(0, i), 14) ?? ref * 0.04
     const entry = ref - 0.1 * atrValue
     const risk = 1.5 * atrValue
     const stop = side === 'long' ? entry - risk : entry + risk

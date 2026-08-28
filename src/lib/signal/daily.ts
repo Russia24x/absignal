@@ -11,7 +11,7 @@
  */
 
 import { db } from '@/lib/db'
-import { runAnalysis, type AnalysisResult } from '@/lib/analysis/engine'
+import { runAnalysis, ENGINE_VERSION, type AnalysisResult } from '@/lib/analysis/engine'
 import { getDailyCloses } from '@/lib/market/geckoterminal'
 
 export function utcDate(d: Date = new Date()): string {
@@ -35,6 +35,7 @@ export async function getTodaySignal(): Promise<AnalysisResult> {
         verdict: analysis.verdict,
         score: analysis.score,
         confidence: analysis.confidence,
+        engine: ENGINE_VERSION,
         dataJson: JSON.stringify(analysis),
         priceAtSignal: analysis.priceUsd,
       },
@@ -58,6 +59,8 @@ export interface HistoryEntry {
   /** True = pre-launch walk-forward reconstruction (real candles, same
    *  engine, no look-ahead) rather than a signal locked live on the day. */
   backfilled: boolean
+  /** Engine generation ('v1' | 'v2' | …) — versioned track record. */
+  engine: string
 }
 
 export interface HistoryResult {
@@ -121,6 +124,7 @@ export async function getSignalHistory(limit = 30): Promise<HistoryResult> {
         changePercent: null,
         outcome: 'PENDING' as const,
         backfilled: false,
+        engine: s.engine,
       }
     }
 
@@ -134,6 +138,7 @@ export async function getSignalHistory(limit = 30): Promise<HistoryResult> {
       changePercent,
       outcome,
       backfilled: s.backfilled,
+      engine: s.engine,
     }
   })
 

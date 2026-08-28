@@ -1,16 +1,24 @@
 /**
  * The Analysis Engine — the heart of PenguSignal.
  *
- * Combines classic technical indicators into a weighted, multi-timeframe
- * composite score (-100..+100) that produces today's verdict:
- * STRONG_BUY / BUY / HOLD / SELL / STRONG_SELL, plus a risk-managed
- * trade plan (entry zone, stop-loss, take-profits) derived from ATR.
+ * v2 (regime-aware): PENGU is a violently mean-reverting asset (avg |daily
+ * move| ≈ 3–4%, 73% range in 3 months). v1's fixed trend-heavy weights
+ * systematically sold bottoms and bought tops — the classic lag failure of
+ * EMA/MACD-style indicators in chop. v2 fixes this on three principled axes:
  *
- * Design goals:
+ *  1) REGIME-AWARE WEIGHTS — ADX decides the regime: choppy (<20) leans on
+ *     mean-reversion voters (RSI/Bollinger/Stochastic), trending (≥25) leans
+ *     on trend voters, in between is balanced.
+ *  2) CHASE DAMPENER — when price is stretched >1.5 ATR from EMA20, trend
+ *     votes in the stretch direction are scaled down (min 0.25×): the engine
+ *     no longer buys blow-off tops or sells capitulation bottoms.
+ *  3) VOLATILITY-SCALED VERDICTS — BUY/SELL thresholds scale with ATR%
+ *     (0.8–1.6×): in high-vol regimes weak-conviction calls become HOLD
+ *     instead of coin-flip entries.
+ *
+ * Design goals (unchanged):
  *  - Deterministic: same candles → same output (auditable & testable).
- *  - Modular: each indicator is a voter; weights live in INDICATOR_WEIGHTS.
- *  - No look-ahead: only closed candles are used (the last, in-progress
- *    candle is dropped before analysis).
+ *  - No look-ahead: only closed candles are used.
  */
 
 import {
@@ -77,17 +85,22 @@ export interface AnalysisResult {
   summary: Record<'en' | 'fa', string>
 }
 
-/** Per-indicator weights inside a single timeframe (sum = 1). */
-const INDICATOR_WEIGHTS = {
-  emaCross: 0.18,
-  ema200: 0.14,
-  rsi: 0.14,
-  macd: 0.16,
-  bollinger: 0.1,
-  stochastic: 0.1,
-  obv: 0.09,
-  roc: 0.09,
+export const ENGINE_VERSION = 'v2'
+
+/** Regime-dependent indicator weights (each sums to 1). */
+const WEIGHTS = {
+  /** Trending regime (ADX ≥ 25) — trend voters lead (v1's weights). */
+  trend: { emaCross: 0.18, ema200: 0.14, rsi: 0.14, macd: 0.16, bollinger: 0.1, stochastic: 0.1, obv: 0.09, roc: 0.09 },
+  /** Balanced regime (20 ≤ ADX < 25 or unknown). */
+  balanced: { emaCross: 0.14, ema200: 0.12, rsi: 0.17, macd: 0.12, bollinger: 0.14, stochastic: 0.13, obv: 0.09, roc: 0.09 },
+  /** Choppy regime (ADX < 20) — mean-reversion voters lead. */
+  meanRevert: { emaCross: 0.1, ema200: 0.1, rsi: 0.2, macd: 0.08, bollinger: 0.18, stochastic: 0.16, obv: 0.08, roc: 0.1 },
 } as const
+
+type Weights = Record<keyof typeof WEIGHTS['trend'], number>
+
+/** Indicators whose votes chase momentum (subject to the dampener). */
+const DAMPABLE = new Set(['emaCross', 'ema200', 'macd', 'roc'])
 
 /** Multi-timeframe weights (sum = 1). Higher TF = more decisive. */
 const TIMEFRAME_WEIGHTS: Record<Timeframe, number> = {
@@ -99,11 +112,16 @@ const TIMEFRAME_WEIGHTS: Record<Timeframe, number> = {
 
 export const VERDICT_THRESHOLDS = { strongBuy: 40, buy: 15, sell: -15, strongSell: -40 } as const
 
-export function verdictFromScore(score: number): Verdict {
-  if (score >= VERDICT_THRESHOLDS.strongBuy) return 'STRONG_BUY'
-  if (score >= VERDICT_THRESHOLDS.buy) return 'BUY'
-  if (score <= VERDICT_THRESHOLDS.strongSell) return 'STRONG_SELL'
-  if (score <= VERDICT_THRESHOLDS.sell) return 'SELL'
+/** Conviction must scale with volatility: ATR% ≈ 4% is the 1.0 baseline. */
+export function volatilityScale(atrPercent: number | null): number {
+  return clamp((atrPercent ?? 4) / 4, 0.8, 1.6)
+}
+
+export function verdictFromScore(score: number, volScale = 1): Verdict {
+  if (score >= VERDICT_THRESHOLDS.strongBuy * volScale) return 'STRONG_BUY'
+  if (score >= VERDICT_THRESHOLDS.buy * volScale) return 'BUY'
+  if (score <= VERDICT_THRESHOLDS.strongSell * volScale) return 'STRONG_SELL'
+  if (score <= VERDICT_THRESHOLDS.sell * volScale) return 'SELL'
   return 'HOLD'
 }
 
@@ -119,6 +137,45 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
   const price = closes[closes.length - 1] ?? 0
   const indicators: IndicatorDetail[] = []
 
+  // --- v2 context: regime (ADX) + overextension (ATR distance from EMA20) ---
+  const adxVal = adx(candles, 14)?.adx ?? null
+  const atrVal = atr(candles, 14)
+  const ema20Ref = ema(closes, 20)
+  const ext = atrVal != null && atrVal > 0 && ema20Ref != null ? (price - ema20Ref) / atrVal : 0
+  const regime: 'trend' | 'balanced' | 'chop' =
+    adxVal == null ? 'balanced' : adxVal >= 25 ? 'trend' : adxVal < 20 ? 'chop' : 'balanced'
+  /**
+   * Fresh-breakout exemption (Donchian-style): if one of the last two
+   * closed candles just made a new 20-candle extreme, momentum deserves
+   * the benefit — the dampener must not fade a fresh breakout/breakdown.
+   */
+  let freshBreakout = false
+  let freshBreakdown = false
+  if (candles.length >= 22) {
+    const recent = candles.slice(-2)
+    const prior = candles.slice(-22, -2)
+    const priorHigh = Math.max(...prior.map((c) => c.high))
+    const priorLow = Math.min(...prior.map((c) => c.low))
+    freshBreakout = recent.some((c) => c.high > priorHigh)
+    freshBreakdown = recent.some((c) => c.low < priorLow)
+  }
+  /**
+   * Scale trend votes that chase an overextended move. Regime-aware:
+   * extensions REVERT in chop (damp hard from 1.5 ATR) but CONTINUE in
+   * strong trends ("overbought stays overbought") — there, only extreme
+   * stretch (>2.5 ATR) is damped, and gently (floor 0.5). Fresh
+   * breakouts/breakdowns are exempt (see above).
+   */
+  const dampParams =
+    regime === 'trend' ? { from: 2.5, floor: 0.5 } : regime === 'balanced' ? { from: 2.0, floor: 0.35 } : { from: 1.5, floor: 0.25 }
+  const chaseDamp = (vote: IndicatorVote): number => {
+    if (vote === 'bullish' && (freshBreakout || ext <= dampParams.from)) return 1
+    if (vote === 'bearish' && (freshBreakdown || ext >= -dampParams.from)) return 1
+    if (vote === 'bullish') return clamp(1 - (ext - dampParams.from) / 2.5, dampParams.floor, 1)
+    return clamp(1 - (-ext - dampParams.from) / 2.5, dampParams.floor, 1)
+  }
+  const W: Weights = regime === 'trend' ? WEIGHTS.trend : regime === 'chop' ? WEIGHTS.meanRevert : WEIGHTS.balanced
+
   const push = (
     key: string,
     vote: IndicatorVote,
@@ -127,7 +184,9 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
     value: number | null,
     display: string
   ) => {
-    const contribution = vote === 'bullish' ? weight * strength : vote === 'bearish' ? -weight * strength : 0
+    // The dampener only applies to momentum-chasing voters.
+    const eff = DAMPABLE.has(key) ? strength * chaseDamp(vote) : strength
+    const contribution = vote === 'bullish' ? weight * eff : vote === 'bearish' ? -weight * eff : 0
     indicators.push({ key, vote, contribution, value, display })
   }
 
@@ -138,9 +197,9 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
     const dist = ((ema20 - ema50) / ema50) * 100
     const strength = clamp(Math.abs(dist) / 2, 0.25, 1)
     const vote: IndicatorVote = dist > 0.05 ? 'bullish' : dist < -0.05 ? 'bearish' : 'neutral'
-    push('emaCross', vote, INDICATOR_WEIGHTS.emaCross, strength, dist, `EMA20 ${dist >= 0 ? '▲' : '▼'} ${Math.abs(dist).toFixed(2)}% vs EMA50`)
+    push('emaCross', vote, W.emaCross, strength, dist, `EMA20 ${dist >= 0 ? '▲' : '▼'} ${Math.abs(dist).toFixed(2)}% vs EMA50`)
   } else {
-    push('emaCross', 'neutral', INDICATOR_WEIGHTS.emaCross, 0, null, 'insufficient data')
+    push('emaCross', 'neutral', W.emaCross, 0, null, 'insufficient data')
   }
 
   // --- 2) Price vs EMA 200 (long-term trend) ---
@@ -149,9 +208,9 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
     const dist = ((price - ema200) / ema200) * 100
     const strength = clamp(Math.abs(dist) / 5, 0.25, 1)
     const vote: IndicatorVote = dist > 0.1 ? 'bullish' : dist < -0.1 ? 'bearish' : 'neutral'
-    push('ema200', vote, INDICATOR_WEIGHTS.ema200, strength, dist, `Price ${dist >= 0 ? 'above' : 'below'} EMA200 (${dist >= 0 ? '+' : ''}${dist.toFixed(2)}%)`)
+    push('ema200', vote, W.ema200, strength, dist, `Price ${dist >= 0 ? 'above' : 'below'} EMA200 (${dist >= 0 ? '+' : ''}${dist.toFixed(2)}%)`)
   } else {
-    push('ema200', 'neutral', INDICATOR_WEIGHTS.ema200, 0, null, 'insufficient data')
+    push('ema200', 'neutral', W.ema200, 0, null, 'insufficient data')
   }
 
   // --- 3) RSI (14) zones ---
@@ -163,9 +222,9 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
     else if (rsiVal <= 30) { vote = 'bullish'; strength = clamp((30 - rsiVal) / 15, 0.4, 1) }
     else if (rsiVal > 55) { vote = 'bullish'; strength = clamp((rsiVal - 55) / 15, 0.2, 0.7) }
     else if (rsiVal < 45) { vote = 'bearish'; strength = clamp((45 - rsiVal) / 15, 0.2, 0.7) }
-    push('rsi', vote, INDICATOR_WEIGHTS.rsi, strength, rsiVal, `RSI(14) = ${rsiVal.toFixed(1)}`)
+    push('rsi', vote, W.rsi, strength, rsiVal, `RSI(14) = ${rsiVal.toFixed(1)}`)
   } else {
-    push('rsi', 'neutral', INDICATOR_WEIGHTS.rsi, 0, null, 'insufficient data')
+    push('rsi', 'neutral', W.rsi, 0, null, 'insufficient data')
   }
 
   // --- 4) MACD histogram ---
@@ -174,9 +233,9 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
     const norm = closes[closes.length - 1] !== 0 ? macdRes.histogram / closes[closes.length - 1] * 1000 : 0
     const strength = clamp(Math.abs(norm) / 1.5, 0.25, 1)
     const vote: IndicatorVote = macdRes.histogram > 0 ? 'bullish' : macdRes.histogram < 0 ? 'bearish' : 'neutral'
-    push('macd', vote, INDICATOR_WEIGHTS.macd, strength, macdRes.histogram, `MACD hist ${macdRes.histogram >= 0 ? '+' : ''}${macdRes.histogram.toExponential(2)}`)
+    push('macd', vote, W.macd, strength, macdRes.histogram, `MACD hist ${macdRes.histogram >= 0 ? '+' : ''}${macdRes.histogram.toExponential(2)}`)
   } else {
-    push('macd', 'neutral', INDICATOR_WEIGHTS.macd, 0, null, 'insufficient data')
+    push('macd', 'neutral', W.macd, 0, null, 'insufficient data')
   }
 
   // --- 5) Bollinger %B ---
@@ -189,9 +248,9 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
     else if (pb < 0) { vote = 'bullish'; strength = 0.8 }
     else if (pb > 0.6) { vote = 'bullish'; strength = clamp((pb - 0.6) / 0.4, 0.2, 0.8) }
     else if (pb < 0.4) { vote = 'bearish'; strength = clamp((0.4 - pb) / 0.4, 0.2, 0.8) }
-    push('bollinger', vote, INDICATOR_WEIGHTS.bollinger, strength, pb, `%B = ${(pb * 100).toFixed(0)}%`)
+    push('bollinger', vote, W.bollinger, strength, pb, `%B = ${(pb * 100).toFixed(0)}%`)
   } else {
-    push('bollinger', 'neutral', INDICATOR_WEIGHTS.bollinger, 0, null, 'insufficient data')
+    push('bollinger', 'neutral', W.bollinger, 0, null, 'insufficient data')
   }
 
   // --- 6) Stochastic ---
@@ -203,9 +262,9 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
     else if (stoch.k <= 20) { vote = 'bullish'; strength = clamp((20 - stoch.k) / 15, 0.4, 1) }
     else if (stoch.k > stoch.d && stoch.k > 50) { vote = 'bullish'; strength = 0.4 }
     else if (stoch.k < stoch.d && stoch.k < 50) { vote = 'bearish'; strength = 0.4 }
-    push('stochastic', vote, INDICATOR_WEIGHTS.stochastic, strength, stoch.k, `Stoch %K=${stoch.k.toFixed(0)} %D=${stoch.d.toFixed(0)}`)
+    push('stochastic', vote, W.stochastic, strength, stoch.k, `Stoch %K=${stoch.k.toFixed(0)} %D=${stoch.d.toFixed(0)}`)
   } else {
-    push('stochastic', 'neutral', INDICATOR_WEIGHTS.stochastic, 0, null, 'insufficient data')
+    push('stochastic', 'neutral', W.stochastic, 0, null, 'insufficient data')
   }
 
   // --- 7) OBV slope (volume-confirmed trend) ---
@@ -213,9 +272,9 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
   if (obv != null) {
     const strength = clamp(Math.abs(obv) / 0.6, 0.25, 1)
     const vote: IndicatorVote = obv > 0.02 ? 'bullish' : obv < -0.02 ? 'bearish' : 'neutral'
-    push('obv', vote, INDICATOR_WEIGHTS.obv, strength, obv, `OBV slope ${obv >= 0 ? '+' : ''}${obv.toFixed(2)} (vol-weighted)`)
+    push('obv', vote, W.obv, strength, obv, `OBV slope ${obv >= 0 ? '+' : ''}${obv.toFixed(2)} (vol-weighted)`)
   } else {
-    push('obv', 'neutral', INDICATOR_WEIGHTS.obv, 0, null, 'insufficient data')
+    push('obv', 'neutral', W.obv, 0, null, 'insufficient data')
   }
 
   // --- 8) ROC momentum ---
@@ -223,13 +282,13 @@ export function analyzeTimeframe(tf: Timeframe, allCandles: Candle[]): Timeframe
   if (rocVal != null) {
     const strength = clamp(Math.abs(rocVal) / 4, 0.25, 1)
     const vote: IndicatorVote = rocVal > 0.1 ? 'bullish' : rocVal < -0.1 ? 'bearish' : 'neutral'
-    push('roc', vote, INDICATOR_WEIGHTS.roc, strength, rocVal, `ROC(10) = ${rocVal >= 0 ? '+' : ''}${rocVal.toFixed(2)}%`)
+    push('roc', vote, W.roc, strength, rocVal, `ROC(10) = ${rocVal >= 0 ? '+' : ''}${rocVal.toFixed(2)}%`)
   } else {
-    push('roc', 'neutral', INDICATOR_WEIGHTS.roc, 0, null, 'insufficient data')
+    push('roc', 'neutral', W.roc, 0, null, 'insufficient data')
   }
 
   const score = clamp(indicators.reduce((a, i) => a + i.contribution, 0) * 100, -100, 100)
-  const trendStrength = adx(candles, 14)?.adx ?? null
+  const trendStrength = adxVal
 
   const bullish = indicators.filter((i) => i.vote === 'bullish').length
   const bearish = indicators.filter((i) => i.vote === 'bearish').length
@@ -344,7 +403,6 @@ export async function runAnalysis(): Promise<AnalysisResult> {
     totalWeight += w
   }
   const score = totalWeight > 0 ? clamp(weighted / totalWeight, -100, 100) : 0
-  const verdict = verdictFromScore(score)
 
   // Confidence: indicator agreement × trend strength.
   const main = timeframes[0]
@@ -363,6 +421,9 @@ export async function runAnalysis(): Promise<AnalysisResult> {
   const price = overview.priceUsd
   const dailyCandles = candles1d.length ? candles1d : candles4h.length ? candles4h : []
   const atrValue = dailyCandles.length ? atr(dailyCandles.slice(0, -1), 14) : null
+  const atrPct = atrValue != null && price > 0 ? (atrValue / price) * 100 : null
+  const volScale = volatilityScale(atrPct)
+  const verdict = verdictFromScore(score, volScale)
   const levels = swingLevels(dailyCandles.length ? dailyCandles.slice(0, -1) : [], 60, 3)
 
   const date = new Date().toISOString().slice(0, 10)
@@ -377,7 +438,7 @@ export async function runAnalysis(): Promise<AnalysisResult> {
     plan: buildPlan(verdict, price, atrValue),
     supports: levels.supports,
     resistances: levels.resistances,
-    atrPercent: atrValue != null && price > 0 ? (atrValue / price) * 100 : null,
+    atrPercent: atrPct,
     summary: buildSummary(verdict, score, confidence, price),
   }
   return result

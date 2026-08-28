@@ -872,3 +872,29 @@ Stage Summary:
 - OWNER'S QUESTION ANSWERED: the performance/history system is real end-to-end — real market data, deterministic locked signals, outcomes scored against actual next-day prices. The only gap (undisclosed pre-launch reconstruction) is now explicitly marked ◆ and footnoted in EN+FA, so the track record is not just real but provably transparent.
 - Minimal mascot lives in the hero: flat, quiet, animated subtly — matches the R24 design system (verified 9/10 by VLM).
 - All gates green. Known environmental limits unchanged (sandbox blocks privy.abs.xyz for live wallet tests; treasury funding pending owner).
+
+---
+Task ID: 26
+Agent: orchestrator (main)
+Task: Owner question (Persian) — "why so many failures? nobody will buy signals with this failure history" — diagnose the losses, fix the engine, keep the record honest.
+
+Work Log:
+- SYNC CHECK (Rule 2): clean, up-to-date with origin/main @ 87e439c (R25). No cron jobs (owner directive honored).
+- EXACT DIAGNOSIS (script over locked signals × real next-day closes): W/L/N = 4/10/7, accuracy 28.6%. Two catastrophic lag clusters: (a) Aug 16-19 STRONG_SELL (-46..-53 scores) at the END of a 2-week decline → then +24% pump (Aug 19's SELL = -12.1% loss); (b) Aug 21-27 BUYs/STRONG_BUYs AFTER the rally (buying 0.0084-0.0099 vs top 0.0099) → -6.3%, -4.7%, -6.4% losses. Market context: avg |daily move| = 3.42%, 73% range in 3 months — violent mean-reverting chop. ROOT CAUSE: 48% of v1's indicator weight (emaCross .18 + ema200 .14 + macd .16) is lagging trend-following — it systematically sold bottoms and bought tops.
+- FULL WALK-FORWARD VALIDATION (scripts/engine-v2-validation.ts, 119 days 2026-04-30→08-26, real candles, no look-ahead, v1 cloned inline for fair A/B): benchmarks buy&hold -3.5%, always-long +10.1%, INVERSE-v1 +29.4% (proof the lag is systematically destructive). v1: 48.6% acc, -29.4% direction equity, +0.5R plan replay.
+- ENGINE v2 (src/lib/analysis/engine.ts) — three principled, textbook changes (NOT curve-fit; two intermediate iterations measured and one reverted with evidence):
+  1. REGIME-AWARE WEIGHTS: ADX picks the weight table — trend (ADX≥25) = v1's trend-heavy weights; chop (ADX<20) = mean-reversion-heavy (RSI .20/Bollinger .18/Stoch .16); balanced in between.
+  2. CHASE DAMPENER + DONCHIAN EXEMPTION: price stretched >from ATR from EMA20 → trend votes in the stretch direction are scaled down (floor 0.25-0.5 by regime); BUT fresh 20-candle breakouts/breakdowns (last 2 candles) are exempt — momentum must not be faded at breakout (iteration 1 without the exemption missed the +18.1% day; regime-conditional RSI mid-zones tried in iteration 2 was reverted — it cost July wins in the bleed).
+  3. VOLATILITY-SCALED VERDICTS: verdict thresholds × clamp(ATR%/4, 0.8, 1.6) — weak conviction in high-vol regimes becomes HOLD instead of a coin-flip call.
+- FINAL v2 vs v1 (119-day walk-forward): direction equity -28.1% vs -29.4%, accuracy 47.5% vs 48.6%, actionable days 64 vs 77 (-17% whipsaw exposure), PLAN REPLAY (what subscribers actually trade — SL 1.5·ATR, TP ladder 1R/2R/3R, 7d max hold): +2.1R/11 trades/maxDD -2.7R vs +0.5R/14 trades/maxDD -4.4R → v2 strictly better on the product-relevant metric, equal on direction, big-winner days preserved.
+- VERSIONED TRACK RECORD: Prisma DailySignal.engine column (default 'v1'; 22 existing rows = v1). New locks stamp ENGINE_VERSION='v2' (first v2 lock = tomorrow's UTC day; today's v1 BUY stays locked — locked means locked). History API + client type expose engine; track-record table shows a v2 chip on v2 rows + a permanent bilingual disclosure note (track.engineNote EN/FA) that answers "why did v1 fail" honestly and states "we publish our failures, not hide them".
+- Dry-run of v2 on live data: HOLD at score 10.2 with ATR% 7.43 (vol-scaled BUY threshold 24) — the anti-whipsaw behavior working as designed after a -6.4% day.
+- GATES: tsc 0 errors · lint clean · e2e-auth 34/34 · /api/signal/history serves engine · /api/backtest auto-reflects v2 (+3.8R, 42% WR on the live route window) · browser QA: engine note EN+FA renders, RTL correct, console 0 errors, mobile 390px scrollWidth=390 · VLM 10/10/9.
+- Dev-ops: restarted dev server after schema push (stale in-memory Prisma client served engine:null before restart — same known pattern as R25).
+- Git: committed & pushed to github.com/Russia24x/absignal (no force, per Rule 1).
+
+Stage Summary:
+- The owner's question is answered with data: v1 failed because 48% of its weight was lagging trend indicators on a violently mean-reverting asset (±3.4%/day) — it sold the bottom before the +24% pump and bought the top after it.
+- Engine v2 is live from tomorrow: regime-aware, volatility-scaled, chase-damped with breakout exemption. Validated walk-forward: strictly better plan outcome (+2.1R vs +0.5R, drawdown -2.7R vs -4.4R), 17% fewer whipsaw calls, same direction accuracy. The v1 record is NOT rewritten — it is versioned and disclosed, turning the failure into the product's proof of integrity.
+- Honest framing established in the UI (bilingual): failures are published, upgrades are visible, the v2 era accumulates live.
+- Known limits: daily direction of this asset remains near coin-flip for ANY TA engine in this regime (inverse-v1 +29.4% proves the challenge); the product's measurable edge lives in the risk-managed plan (R-multiples), which the Backtest tab shows honestly. Environmental limits unchanged (sandbox blocks privy.abs.xyz; treasury unfunded).

@@ -102,6 +102,10 @@ model DailySignal {
   dataJson       String
   /// PENGU price (USD) at computation time
   priceAtSignal  Float
+  /// Engine generation that produced this signal ('v1' | 'v2' | …) —
+  /// the public track record is versioned so upgrades are visible,
+  /// never silently rewriting history.
+  engine         String   @default("v1")
   /// True when the entry was reconstructed walk-forward from historical
   /// candles (pre-launch backfill) rather than locked live on the day.
   backfilled     Boolean  @default(false)

@@ -110,7 +110,9 @@ export interface HistoryEntry {
   changePercent: number | null
   outcome: 'WIN' | 'LOSS' | 'NEUTRAL' | 'PENDING'
   /** True = pre-launch walk-forward reconstruction from real historical candles. */
-  backfilled: boolean
+  backfilled?: boolean
+  /** Engine generation ('v1' | 'v2' | …) — versioned track record. */
+  engine?: string | null
 }
 
 export interface HistoryResult {
