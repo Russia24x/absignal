@@ -27,6 +27,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'invalid_address' }, { status: 400 })
   }
 
-  const { message, expiresAt } = await createNonce(address)
+  // EIP-4361 domain: the requesting host (prevents cross-site message reuse).
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
+  const domain = host || undefined
+
+  const { message, expiresAt } = await createNonce(address, domain)
   return NextResponse.json({ message, expiresAt })
 }

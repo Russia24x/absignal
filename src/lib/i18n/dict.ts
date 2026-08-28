@@ -235,6 +235,17 @@ export const dict = {
       mostPopular: 'Most popular',
     },
 
+    // Abstract Portal app voting
+    vote: {
+      title: 'Enjoying PenguSignal?',
+      desc: 'Support us on the Abstract Portal — one on-chain vote per epoch with your wallet. Gas for voting is sponsored by Abstract.',
+      upvote: 'Upvote on Abstract',
+      connectToVote: 'Connect to vote',
+      voted: 'Voted — thank you!',
+      success: 'Vote submitted on-chain — thank you!',
+      failed: 'Vote failed — please try again',
+    },
+
     // Track record
     track: {
       title: 'Transparent track record',
@@ -833,6 +844,16 @@ export const dict = {
       foreverBadge: 'همیشه',
       lifetimeThanks: 'یک پرداخت یک‌باره — همه سیگنال‌ها برای همیشه. دیگر هرگز تمدید لازم نیست.',
       mostPopular: 'محبوب‌ترین',
+    },
+
+    vote: {
+      title: 'از پنگوسیگنال خوشتان آمده؟',
+      desc: 'در پورتال Abstract از ما حمایت کنید — هر اپوک یک رأی روی زنجیره با کیف پول شما. گس رأی‌دادن توسط Abstract اسپانسری می‌شود.',
+      upvote: 'رأی در Abstract',
+      connectToVote: 'برای رأی‌دادن متصل شوید',
+      voted: 'رأی داده شد — ممنون!',
+      success: 'رأی شما روی زنجیره ثبت شد — ممنون!',
+      failed: 'رأی‌دادن ناموفق بود — دوباره تلاش کنید',
     },
 
     track: {

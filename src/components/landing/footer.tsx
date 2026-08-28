@@ -6,9 +6,11 @@
  */
 
 import { useState } from 'react'
-import { Check, Copy, ExternalLink, ShieldCheck } from 'lucide-react'
+import { ArrowBigUp, Check, Copy, ExternalLink, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { PenguLogo } from '@/components/pengu-logo'
+import { AbstractVotingButton } from '@/components/abstract/voting-button'
+import { votingSupported } from '@/lib/abstract/voting-contract'
 import { useI18n } from '@/lib/i18n/context'
 import { useAppConfig } from '@/hooks/use-app-data'
 import { appChain, treasuryAddress } from '@/lib/chains'
@@ -75,9 +77,27 @@ export function Footer() {
   const { data: config } = useAppConfig()
   const year = new Date().getFullYear()
   const explorer = config?.chain.blockExplorerUrl ?? appChain.blockExplorers.default.url
+  const showVoteBanner = votingSupported // enabled via NEXT_PUBLIC_ABSTRACT_APP_ID
 
   return (
     <footer className="mt-auto border-t border-border/40 bg-[#050d16]/80 backdrop-blur-md">
+      {/* Abstract Portal upvote banner — rendered once the app is listed */
+      showVoteBanner && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <ArrowBigUp className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">{t.vote.title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{t.vote.desc}</p>
+              </div>
+            </div>
+            <AbstractVotingButton className="sm:shrink-0" />
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 py-10">
         <div className="grid gap-8 md:grid-cols-[1.3fr_0.85fr_1fr] md:items-start">
           {/* Brand */}

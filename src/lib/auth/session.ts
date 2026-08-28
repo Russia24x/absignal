@@ -47,19 +47,36 @@ export interface AuthNonceRecord {
   expiresAt: Date
 }
 
-/** Create a single-use sign-in nonce for a wallet address. */
-export async function createNonce(address: string): Promise<AuthNonceRecord> {
+/**
+ * Create a single-use sign-in nonce for a wallet address.
+ *
+ * The message follows the EIP-4361 (Sign-In with Ethereum) field layout —
+ * domain, address, statement, URI, version, chain-id, nonce, issued-at,
+ * expiration-time — adapted to the Abstract chain. The exact message is
+ * stored verbatim; the verify step compares against this string, so there
+ * is zero reconstruction drift.
+ */
+export async function createNonce(
+  address: string,
+  domain?: string,
+): Promise<AuthNonceRecord> {
   const nonce = randomBytes(24).toString('hex')
   const expiresAt = new Date(Date.now() + authConfig.nonceTtlMs)
+  const issuedAt = new Date().toISOString()
+  const safeDomain = domain || 'PenguSignal'
   const message = [
-    'PenguSignal — Sign in with your Abstract wallet',
+    `${safeDomain} wants you to sign in with your Abstract wallet account:`,
+    address,
     '',
-    `Address: ${address}`,
-    `Network: Abstract`,
+    'By signing, you prove ownership of this wallet. This signature does not',
+    'move funds, approve tokens, or charge you anything.',
+    '',
+    'URI: https://pengusignal.app',
+    'Version: 1',
+    'Chain ID: 2741',
     `Nonce: ${nonce}`,
-    `Issued: ${new Date().toISOString()}`,
-    '',
-    'This signature proves wallet ownership. It does not move funds.',
+    `Issued At: ${issuedAt}`,
+    `Expiration Time: ${expiresAt.toISOString()}`,
   ].join('\n')
   // The exact message is stored verbatim — the verify step compares against
   // this string, so there is zero reconstruction drift.

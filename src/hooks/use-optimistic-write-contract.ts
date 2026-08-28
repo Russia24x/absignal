@@ -11,13 +11,13 @@
  *    receives a transaction hash INSTANTLY (pre-confirmation) while the
  *    receipt is polled separately.
  *
- *  • GAS SPONSORSHIP: when a sponsor paymaster is configured
- *    (NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS — the "General" flow from the
- *    official useWriteContractSponsored hook), the paymaster fields are
- *    attached to the transaction request so the USER PAYS ZERO GAS
- *    (the app sponsors it). AGW account deployment itself is already
- *    sponsored by Abstract's default paymaster, so brand-new wallets can
- *    transact too (see AGW FAQ, docs.abs.xyz).
+ *  • GAS SPONSORSHIP is applied at the PROVIDER level (official
+ *    `customPaymasterHandler` on `AbstractWalletProvider`, see
+ *    wallet/agw-gate.tsx): when NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS is
+ *    configured, EVERY wallet transaction — including the signing step
+ *    below AND the standard wagmi fallback — automatically carries the
+ *    sponsor paymaster, so the user pays zero gas. AGW account deployment
+ *    itself is already sponsored by Abstract's default paymaster.
  *
  *  • Falls back gracefully: the caller can catch errors and retry through
  *    a standard wagmi writeContract if the optimistic endpoint is
@@ -26,13 +26,7 @@
 
 import { useCallback, useState } from 'react'
 import { useAccount, useWalletClient } from 'wagmi'
-import {
-  encodeFunctionData,
-  type Abi,
-  type Address,
-  type Hex,
-} from 'viem'
-import { getGeneralPaymasterInput } from 'viem/zksync'
+import { encodeFunctionData, type Abi, type Address } from 'viem'
 import {
   sendRawTransactionWithDetailedOutput,
   type OptimisticTransactionResponse,
@@ -44,18 +38,15 @@ export interface OptimisticWriteConfig {
   abi: Abi
   functionName: string
   args?: readonly unknown[]
-  /**
-   * Explicit paymaster override for this call. When omitted, the app-wide
-   * sponsor paymaster (NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS) is used if
-   * configured.
-   */
-  paymaster?: Address
-  paymasterInput?: Hex
   onSuccess?: (data: OptimisticTransactionResponse, startTime: number) => void
   onError?: (error: Error) => void
 }
 
-/** Sponsor paymaster (General flow) — optional, env-configured. */
+/**
+ * Sponsor paymaster address (env-configured). The handler itself is mounted
+ * in `AgwGate`'s AbstractWalletProvider — this export exists so UI surfaces
+ * (e.g. the payment dialog) can display the sponsored-fee state.
+ */
 export const sponsorPaymasterAddress = (
   process.env.NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS || undefined
 ) as Address | undefined
@@ -80,7 +71,7 @@ export function useOptimisticWriteContract() {
       setData(undefined)
 
       try {
-        const { onSuccess, onError, paymaster, paymasterInput, ...contractParams } = config
+        const { onSuccess, onError, ...contractParams } = config
 
         // 1. Encode the contract call.
         const txData = encodeFunctionData({
@@ -89,33 +80,23 @@ export function useOptimisticWriteContract() {
           args: contractParams.args as unknown[] | undefined,
         })
 
-        // 2. Gas sponsorship (official useWriteContractSponsored pattern):
-        //    attach paymaster fields so the paymaster covers the user's gas.
-        const effectivePaymaster = paymaster ?? sponsorPaymasterAddress
+        // 2. Prepare the request (gas estimation via the chain RPC). Any
+        //    sponsor paymaster is attached automatically by the AGW
+        //    provider's customPaymasterHandler during signing.
         const request = {
           to: contractParams.address,
           data: txData,
-          ...(effectivePaymaster
-            ? {
-                paymaster: effectivePaymaster,
-                paymasterInput:
-                  paymasterInput ?? getGeneralPaymasterInput({ innerInput: '0x' }),
-              }
-            : {}),
-          // zksync-specific request fields are structurally valid here; cast
-          // for viem's generic transaction-request typing.
         } as Parameters<typeof walletClient.prepareTransactionRequest>[0]
-
-        // 3. Prepare (gas estimation via the chain RPC)…
         const prepared = await walletClient.prepareTransactionRequest(request)
 
-        // 4. …and sign — this triggers the AGW approval UI synchronously
-        //    within the caller's user-gesture chain (popup-safe).
+        // 3. Sign — this triggers the AGW approval UI synchronously within
+        //    the caller's user-gesture chain (popup-safe). The AGW client
+        //    applies EIP-712 formatting + paymaster params here.
         const signedTransaction = (await walletClient.signTransaction(
           prepared as Parameters<typeof walletClient.signTransaction>[0],
         )) as `0x${string}`
 
-        // 5. Optimistic submission — instant hash, pre-confirmation.
+        // 4. Optimistic submission — instant hash, pre-confirmation.
         const startTime = Date.now()
         const result = await sendRawTransactionWithDetailedOutput(signedTransaction)
 

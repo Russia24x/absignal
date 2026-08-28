@@ -29,10 +29,12 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from 'react'
 import { AbstractWalletProvider } from '@abstract-foundation/agw-react'
+import { getGeneralPaymasterInput } from 'viem/zksync'
 import type { QueryClient } from '@tanstack/react-query'
 import { appChain, appChainTransport } from '@/lib/chains'
 
@@ -110,6 +112,27 @@ export function AgwGate({
   const [status, setStatus] = useState<WalletStatus>('checking')
   const [attempt, setAttempt] = useState(0)
 
+  /**
+   * Optional app-wide gas sponsorship (official `customPaymasterHandler`
+   * on AbstractWalletProvider — the useWriteContractSponsored pattern at
+   * provider level): when NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS is set,
+   * EVERY wallet transaction (payments, and any future contract write,
+   * including the standard wagmi fallback path) is signed with the sponsor
+   * paymaster attached, so users pay ZERO network fee. AGW account
+   * deployment is separately sponsored by Abstract's default paymaster.
+   */
+  const customPaymasterHandler = useMemo(() => {
+    const sponsor = (
+      process.env.NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS || undefined
+    ) as `0x${string}` | undefined
+    return sponsor
+      ? async () => ({
+          paymaster: sponsor,
+          paymasterInput: getGeneralPaymasterInput({ innerInput: '0x' }),
+        })
+      : undefined
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     probeWalletBackends()
@@ -139,6 +162,7 @@ export function AgwGate({
             chain={appChain}
             transport={appChainTransport}
             queryClient={queryClient}
+            customPaymasterHandler={customPaymasterHandler}
           >
             {children}
           </AbstractWalletProvider>

@@ -67,14 +67,27 @@ pay the gas — fractions of a cent per tx on Abstract):
    an alert — a compromised paymaster only risks its own balance).
 3. Set the variable (plaintext is fine — the address is public):
    `NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS=0xYourPaymaster…`
-4. Redeploy. The payment dialog now shows "Network fee: sponsored — you
-   pay 0 gas" and payment txs are submitted with the paymaster attached
-   (the official `useWriteContractSponsored` pattern from
-   `docs.abs.xyz/abstract-global-wallet/agw-react/hooks/useWriteContractSponsored`).
+4. Redeploy. The sponsorship is applied at the **provider level** — the
+   official `customPaymasterHandler` on `AbstractWalletProvider`
+   (see `src/components/wallet/agw-gate.tsx`), the same mechanism as the
+   official `useWriteContractSponsored` hook
+   (`docs.abs.xyz/abstract-global-wallet/agw-react/hooks/useWriteContractSponsored`)
+   — so EVERY wallet transaction (payment, vote, future writes) carries
+   the paymaster automatically, and the payment dialog shows "Network fee:
+   sponsored — you pay 0 gas".
 
 Without a paymaster configured, users simply pay normal (very low)
 Abstract gas from their wallet ETH, and the AGW deployment fee is already
 sponsored by Abstract.
+
+### Optional: Abstract Portal app voting
+
+Once the app is listed on the [Abstract Portal](https://abs.xyz/portal),
+set `NEXT_PUBLIC_ABSTRACT_APP_ID=<numeric id from the portal URL>` and an
+official "Upvote on Abstract" banner appears in the footer (on-chain vote
+via the canonical voting contract `0x3b50de27506f0a8c1f4122a1e6f470009a76ce2a`,
+one vote per epoch per wallet — official AGW Reusables pattern). This is
+free growth: portal ranking drives discovery.
 
 ---
 
@@ -264,6 +277,7 @@ In the same setup screen → **Variables and Secrets**:
 | Variable | `NEXT_PUBLIC_PENGU_MAINNET` | `0x9ebe3a824ca958e4b3da772d2065518f009cba62` |
 | Variable | `NEXT_PUBLIC_TREASURY_ADDRESS` | `0x60Df4E186364c3a49A550Aee29Da1d5fe3658818` |
 | Variable | `NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS` | *(optional — see §0.5; empty = users pay own gas)* |
+| Variable | `NEXT_PUBLIC_ABSTRACT_APP_ID` | *(optional — portal listing id; enables the Upvote banner)* |
 | Variable | `GECKOTERMINAL_NETWORK` | `abstract` |
 | Variable | `GECKOTERMINAL_POOL` | `0xda7d037fda848177141e037f9d0c67cae7b53262` |
 | Variable | `SUBSCRIPTION_1D_PRICE_PENGU` | `10` |
