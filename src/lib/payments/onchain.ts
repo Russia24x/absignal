@@ -135,7 +135,11 @@ export function penguToWei(units: number): string {
   const fixed = Math.abs(units).toFixed(6)
   const [wholeStr, fracStr = '000000'] = fixed.split('.')
   const fracScaled = (fracStr + '0'.repeat(PENGU_DECIMALS)).slice(0, PENGU_DECIMALS)
-  const wei = BigInt(wholeStr) * 10n ** BigInt(PENGU_DECIMALS) + BigInt(fracScaled)
+  // NOTE: BigInt(10) instead of the 10n literal — tsconfig targets ES2017 and
+  // bigint *literals* require ES2020+ (BigInt itself is a runtime global,
+  // available in every browser that can run a wallet).
+  const wei =
+    BigInt(wholeStr) * BigInt(10) ** BigInt(PENGU_DECIMALS) + BigInt(fracScaled)
   return (units < 0 ? -wei : wei).toString()
 }
 
