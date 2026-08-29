@@ -1105,3 +1105,19 @@ Stage Summary:
 - Landing-page price card is now dual-sourced: GeckoTerminal primary, DexScreener fallback — both verified working from the deployed Worker's own egress. The $0.00/error price-card failure mode is eliminated (R34 killed cache-poisoning; R35 kills the single-source dependency).
 - Candles (chart) and signal computation remain GeckoTerminal-only by design (signal-source integrity); they ride the intermittent windows with retry+cache+stale-serving. Durable fix options recorded for the owner: GeckoTerminal paid API key, or a future on-chain candle builder.
 - Post-deploy live verification: [pending CI — verified in R36 if anything remains]
+
+---
+Task ID: 35-b
+Agent: orchestrator (main)
+Task: R35 live verification + closure of the production-data epic.
+
+Work Log:
+- R35-b cleanup: the diag-route deletion was missed by R35's `git add` pathspec — committed and pushed separately (9f726f4); CI green (build started 09:35:29Z, success).
+- LIVE PROOF OF THE FALLBACK: /api/market/overview at 09:36:25Z returned source:dexscreener, priceUsd 0.008956, PENGU/WETH, stale:false — i.e. at that moment GeckoTerminal was blocking the Worker egress (as diagnosed) and DexScreener served the snapshot exactly as designed. The single-point-of-failure on the price card is gone.
+- BROWSER QA (agent-browser, live): hero shows real price $0.00896 (was $0.00000 in R34's before-patch screenshot), track-record table renders its rows, console has zero errors/warnings. Full-page screenshot: download/r35-live-final.png.
+- PRODUCTION STATE after this round: configOk:true · live price card (dual-sourced) · 21-day versioned track record in remote D1 · paywall + SIWE sessions working · charts/signal computation on GeckoTerminal with retry+cache+stale-serving riding the intermittent egress windows.
+
+Stage Summary:
+- The production no-data epic (owner reports R31→R35) is CLOSED: root causes were (in order) missing runtime vars (owner fixed — runtime scope + encrypted secret), GeckoTerminal soft-limiting the shared Workers egress IP (fixed for the price card via DexScreener fallback; hardened everywhere with retry + payload validation), and the empty-200 cache-poisoning (fixed in R34).
+- Durable-fix options left to the owner (documented): GeckoTerminal paid API key for guaranteed OHLCV budget, treasury funding, optional SESSION_SECRET rotation (value was pasted in chat), custom domain.
+- Next-round candidates: allowedDevOrigins dev fix, backfill-guard hardening, prisma preview-flag cleanup, token rotation.
