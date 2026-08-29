@@ -389,6 +389,14 @@ npx wrangler d1 migrations apply pengusignal --remote
 - **Rollback**: *Deployments* tab → pick a green deployment → **Rollback**.
 - **Secrets**: *Settings → Variables and Secrets* → edit → **Save and deploy**
   applies on the next build.
+- **Observability / Workers Logs**: codified in `wrangler.jsonc` →
+  `observability.logs.enabled: true` (100% head sampling, `persist: true`,
+  invocation logs on; `traces.enabled: false` — tracepoints off). The
+  dashboard's *Observability* view shows the same JSON plus
+  `redact_query_string: false`, a key wrangler 4.127 no longer accepts —
+  its default (no redaction) already matches, so it is omitted from the
+  repo config. The repo is the source of truth: a dashboard toggle here is
+  overwritten by the next CI deploy.
 - **Logs**: *Logs → Real-time / Past logs* — request-level, no extra setup.
 
 ### 3.7 Disconnecting GitHub (if ever needed)

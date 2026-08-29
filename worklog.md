@@ -1026,3 +1026,23 @@ Stage Summary:
 - "No data" root cause CONFIRMED as configuration-only — exactly TWO missing runtime vars: `GECKOTERMINAL_POOL` (kills all market data → no price) and `SESSION_SECRET` (kills sessions/auth/history). Remote D1 migration also still pending (owner-side command).
 - Owner runbook delivered (Persian): (1) add GECKOTERMINAL_POOL = 0xda7d037fda848177141e037f9d0c67cae7b53262 (Plain text) + SESSION_SECRET = openssl rand -hex 32 output (encrypted Secret) in the Worker's Variables and Secrets → Save and deploy; (2) `npx wrangler login && npx wrangler d1 migrations apply pengusignal --remote`; (3) confirm the CI build is green; (4) verify /api/config → configOk:true, /api/signal/history → ~21 rows, /api/market/overview → live price.
 - Next-round candidates (unchanged): allowedDevOrigins dev fix, backfill-guard hardening, prisma preview-flag cleanup, token rotation after deploy work wraps up.
+
+---
+Task ID: 32
+Agent: orchestrator (main)
+Task: Owner (Persian): "فکر کنم انجام دادم ، اینم درست کن" + the worker's observability settings JSON copied from the Cloudflare dashboard — codify it into the repo config, deploy-safe.
+
+Work Log:
+- SYNC CHECK (Rule 2): clean — local == origin/main @ c3e6fe1 (R31), ahead/behind 0/0.
+- LIVE VERIFICATION of the owner's runbook work: /api/signal/history now returns 200 `{"entries":[],...}` (was 502 `history_unavailable` in R31's diagnosis) → the remote D1 migration LANDED (DailySignal table exists; empty because backfill still can't fetch candles — GECKOTERMINAL_POOL unset). /api/market/overview still 502 market_data_unavailable; /api/config still `configOk:false` with exactly `GECKOTERMINAL_POOL` + `SESSION_SECRET` missing → those two dashboard vars are the ONLY remaining production-data blockers.
+- SCHEMA RESEARCH against the exact deploy toolchain: parsed node_modules/wrangler/config-schema.json (wrangler 4.127.1 — the version CI resolves) → `observability.logs{enabled, head_sampling_rate, invocation_logs, persist, destinations}` and `observability.traces{enabled, head_sampling_rate, persist, destinations}` are supported; `redact_query_string` is ABSENT from the schema (additionalProperties:false).
+- EMPIRICAL VALIDATION with scratch configs + `npx wrangler deploy --dry-run`: the owner's verbatim JSON → ⚠️ "Unexpected fields found in observability field: redact_query_string"; the same JSON minus that key (keeping legacy `enabled:false`, `head_sampling_rate`, nested logs/traces verbatim) → clean, ZERO warnings. Decision: drop only `redact_query_string` (its value false = default no-redaction behavior, so dropping it is semantically identical).
+- APPLIED to wrangler.jsonc: `observability` block mirroring the dashboard state — Workers Logs ON (persist:true, invocation_logs:true, head_sampling_rate:1), tracepoints OFF (traces.enabled:false), legacy top-level enabled:false/head_sampling_rate:1 kept for byte-parity with the dashboard — with a comment explaining the omitted key.
+- DOCS: DEPLOYMENT.md §3.6 Day-2 ops +1 bullet — observability codified in wrangler.jsonc, repo is the source of truth (dashboard toggles are overwritten by the next CI deploy), redact_query_string removal documented.
+- GATES: `bun run cf-typegen` → wrangler re-parsed the new config with ZERO warnings, cloudflare-env.d.ts byte-identical (observability adds no bindings) · `bun run typecheck` → 0 errors · `bun run lint` → clean. Zero runtime-code changes.
+- Git: pre-push re-fetch confirmed remote unmoved at c3e6fe1 → single commit, normal push, NO force (Rule 1). The push triggers a Workers Builds redeploy that now re-applies the same observability settings (no dashboard↔repo drift).
+
+Stage Summary:
+- The owner's observability JSON is codified deploy-safe in wrangler.jsonc (validated against the exact wrangler 4.127.1 CI uses — the one unsupported key dropped with rationale).
+- Owner's side confirmed: remote D1 migration applied. STILL MISSING (the only thing between the owner and live production data): `GECKOTERMINAL_POOL` (plain Variable) + `SESSION_SECRET` (encrypted Secret) in the Workers Builds Variables → Save and deploy — then /api/config → configOk:true, market price + 21-row backfilled track record appear.
+- Next-round candidates (unchanged): allowedDevOrigins dev fix, backfill-guard hardening, prisma preview-flag cleanup, token rotation after deploy work wraps up.

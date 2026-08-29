@@ -35,5 +35,26 @@
                 // Enable image optimization
                 // see https://opennext.js.org/cloudflare/howtos/image
                 "binding": "IMAGES"
+        },
+        // Observability — mirrors the worker's dashboard settings (R32):
+        // Workers Logs ON (persisted, invocation logs, 100% head sampling),
+        // tracepoints OFF. The dashboard-exported JSON also carries
+        // "redact_query_string": false — wrangler 4.127 removed that key
+        // (unexpected-field warning on deploy), and false is already the
+        // default (no redaction), so it is intentionally omitted here.
+        "observability": {
+                "enabled": false,
+                "head_sampling_rate": 1,
+                "logs": {
+                        "enabled": true,
+                        "head_sampling_rate": 1,
+                        "persist": true,
+                        "invocation_logs": true
+                },
+                "traces": {
+                        "enabled": false,
+                        "head_sampling_rate": 1,
+                        "persist": true
+                }
         }
 }
