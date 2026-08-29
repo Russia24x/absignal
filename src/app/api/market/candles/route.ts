@@ -20,8 +20,8 @@ export async function GET(req: Request) {
   const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 200), 30), 500)
 
   try {
-    const { candles, stale, fetchedAt } = await getCandlesWithMeta(tf, limit)
-    return NextResponse.json({ timeframe: tf, candles, stale, fetchedAt })
+    const { candles, stale, fetchedAt, synthetic } = await getCandlesWithMeta(tf, limit)
+    return NextResponse.json({ timeframe: tf, candles, stale, fetchedAt, synthetic: synthetic ?? false })
   } catch {
     return NextResponse.json({ error: 'market_data_unavailable' }, { status: 502 })
   }

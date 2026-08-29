@@ -140,6 +140,21 @@ model CandleCache {
   @@index([pool, tf, time])
 }
 
+/// Live price observations (R37): every fresh overview fetch (GeckoTerminal
+/// OR the DexScreener fallback — the latter is reachable from the Workers
+/// egress even during GeckoTerminal outages) records one tick. Ticks build
+/// DISPLAY-ONLY candles when real OHLCV is unavailable, so the chart always
+/// shows something real. Never fed to the signal engine (synthetic candles
+/// are refused there — signal-source integrity).
+model PriceTick {
+  id       Int    @id @default(autoincrement())
+  /// Observation time, unix seconds
+  ts       Int
+  priceUsd Float
+
+  @@index([ts])
+}
+
 /// LEGACY (pre-v2 tariff): per-user per-day unlocks bought with 1 PENGU.
 /// Kept as an audit trail of old day-passes; the new tariff is purely
 /// time-based (see lib/config.ts subscriptionPackages).

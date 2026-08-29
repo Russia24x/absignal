@@ -325,14 +325,19 @@ export async function getMarketOverviewWithMeta(): Promise<OverviewWithMeta> {
     key,
     marketConfig.priceTtlMs,
     async () => {
+      let overview: MarketOverview
       try {
-        return await fetchOverview()
+        overview = await fetchOverview()
       } catch {
         // GeckoTerminal is intermittently hard-limited from the shared Workers
         // egress IP (R34/R35 ground truth) — fall back to DexScreener so the
         // landing-page price card never goes dark. Engine paths do NOT use this.
-        return await fetchOverviewViaDexScreener()
+        overview = await fetchOverviewViaDexScreener()
       }
+      // R37: record a live observation for the synthetic-candle builder
+      // (works through outages via the DexScreener fallback).
+      await persistTick(overview.priceUsd)
+      return overview
     }
   )
   return { ...value, stale, fetchedAt }
@@ -381,6 +386,9 @@ export interface CandlesWithMeta {
   candles: Candle[]
   stale: boolean
   fetchedAt: number
+  /** R37: candles were synthesized from live price observations (ticks) —
+   * display-only. The engine and backtests refuse synthetic candles. */
+  synthetic?: boolean
 }
 
 /* --------------------- durable candle cache (R36) --------------------- */
@@ -508,6 +516,110 @@ async function readPersistedCandles(tf: Timeframe, limit: number): Promise<Candl
   }
 }
 
+/* -------------------- live price ticks (R37) -------------------- */
+
+/**
+ * Live price observations. Every FRESH overview fetch (primary or the
+ * DexScreener fallback) records one tick — the DexScreener path works from
+ * the Workers egress even while GeckoTerminal is blocked, so ticks keep
+ * flowing through outages. Ticks synthesize display-only candles when real
+ * OHLCV is unavailable: the chart fills from "now" forward while the durable
+ * candle cache waits for an upstream window.
+ */
+const TICK_TABLE_DDL = `
+CREATE TABLE IF NOT EXISTS "PriceTick" (
+  "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  "ts" INTEGER NOT NULL,
+  "priceUsd" REAL NOT NULL
+)`
+
+let tickTableReady = false
+
+async function ensureTickTable(): Promise<boolean> {
+  if (tickTableReady) return true
+  try {
+    const { getDb } = await import('@/lib/db')
+    const db = await getDb()
+    await db.$executeRawUnsafe(TICK_TABLE_DDL)
+    await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PriceTick_ts_idx" ON "PriceTick" ("ts")`)
+    tickTableReady = true
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Record one live observation. Fire-and-forget semantics: any failure is
+ * silently dropped — ticks are a progressive enhancement, never a dependency. */
+async function persistTick(priceUsd: number): Promise<void> {
+  if (!(priceUsd > 0)) return
+  if (!(await ensureTickTable())) return
+  try {
+    const { getDb } = await import('@/lib/db')
+    const db = await getDb()
+    await db.$executeRaw`INSERT INTO "PriceTick" ("ts", "priceUsd") VALUES (${Math.floor(Date.now() / 1000)}, ${priceUsd})`
+    // Opportunistic prune: keep ~7 days of ticks.
+    if (Math.random() < 0.1) {
+      await db
+        .$executeRawUnsafe(`DELETE FROM "PriceTick" WHERE "ts" < ${Math.floor(Date.now() / 1000) - 7 * 86400}`)
+        .catch(() => {})
+    }
+  } catch {
+    // best-effort
+  }
+}
+
+const BUCKET_SECONDS: Record<Timeframe, number> = {
+  '15m': 900,
+  '1h': 3600,
+  '4h': 14400,
+  '1d': 86400,
+}
+
+/** Build display-only candles from accumulated live ticks. Requires at least
+ * two observations in different buckets for the requested timeframe. */
+async function buildSyntheticCandles(tf: Timeframe, limit: number): Promise<Candle[]> {
+  if (!(await ensureTickTable())) return []
+  try {
+    const { getDb } = await import('@/lib/db')
+    const db = await getDb()
+    const bucketSec = BUCKET_SECONDS[tf]
+    const lookbackSec = Math.min(limit * bucketSec + bucketSec, 7 * 86400)
+    const since = Math.floor(Date.now() / 1000) - lookbackSec
+    const ticks = await db.priceTick.findMany({
+      where: { ts: { gte: since } },
+      orderBy: { ts: 'asc' },
+      take: 20000,
+    })
+    if (ticks.length < 2) return []
+    const buckets = new Map<number, Candle>()
+    for (const t of ticks) {
+      if (!(t.priceUsd > 0)) continue
+      const bucket = Math.floor(t.ts / bucketSec) * bucketSec
+      const b = buckets.get(bucket)
+      if (!b) {
+        buckets.set(bucket, {
+          time: bucket,
+          open: t.priceUsd,
+          high: t.priceUsd,
+          low: t.priceUsd,
+          close: t.priceUsd,
+          volume: 0,
+        })
+      } else {
+        b.high = Math.max(b.high, t.priceUsd)
+        b.low = Math.min(b.low, t.priceUsd)
+        b.close = t.priceUsd
+      }
+    }
+    const candles = [...buckets.values()].sort((a, b) => a.time - b.time)
+    if (candles.length < 2) return []
+    return candles.slice(-limit)
+  } catch {
+    return []
+  }
+}
+
 /** While serving the D1 fallback, retry the live upstream at most this often. */
 const D1_FALLBACK_TTL_MS = 30_000
 
@@ -556,6 +668,17 @@ export async function getCandlesWithMeta(tf: Timeframe, limit = 200): Promise<Ca
           trimCache()
           return { candles: persisted, stale: true, fetchedAt }
         }
+        // Last tier (R37): synthesize display-only candles from live price
+        // ticks (DexScreener-backed — keeps flowing through outages). The
+        // chart gets SOMETHING real instead of an empty canvas; the engine
+        // refuses synthetic candles (see getCandles).
+        const synthetic = await buildSyntheticCandles(tf, limit)
+        if (synthetic.length > 0) {
+          const fetchedAt = Date.now()
+          cache.set(key, { value: synthetic, fetchedAt, expiresAt: fetchedAt + D1_FALLBACK_TTL_MS })
+          trimCache()
+          return { candles: synthetic, stale: true, synthetic: true, fetchedAt }
+        }
         throw err
       }
     } finally {
@@ -567,9 +690,14 @@ export async function getCandlesWithMeta(tf: Timeframe, limit = 200): Promise<Ca
   return task
 }
 
-/** Value-only variant for the analysis engine / signal service. */
+/** Value-only variant for the analysis engine / signal service.
+ * REFUSES synthetic (tick-built) candles — signals and backtests must only
+ * ever be computed from real OHLCV (signal-source integrity, R37). */
 export async function getCandles(tf: Timeframe, limit = 200): Promise<Candle[]> {
-  const { candles } = await getCandlesWithMeta(tf, limit)
+  const { candles, synthetic } = await getCandlesWithMeta(tf, limit)
+  if (synthetic) {
+    throw new Error(`synthetic candles are display-only (tf=${tf})`)
+  }
   return candles
 }
 

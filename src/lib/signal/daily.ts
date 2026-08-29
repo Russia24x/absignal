@@ -12,7 +12,7 @@
 
 import { getDb } from '@/lib/db'
 import { runAnalysis, ENGINE_VERSION, type AnalysisResult } from '@/lib/analysis/engine'
-import { getDailyCloses } from '@/lib/market/geckoterminal'
+import { getDailyCloses, getMarketOverview } from '@/lib/market/geckoterminal'
 
 export function utcDate(d: Date = new Date()): string {
   return d.toISOString().slice(0, 10)
@@ -84,6 +84,28 @@ export async function getSignalHistory(limit = 30): Promise<HistoryResult> {
   })
   const closes = await getDailyCloses(90).catch(() => [] as Array<{ date: string; close: number }>)
   const closeMap = new Map(closes.map((c) => [c.date, c.close]))
+
+  // Close-series fallback (R37): when the upstream is unavailable (and the
+  // durable candle cache is still cold) the live close series is empty and
+  // every outcome would collapse to PENDING → the whole record reads LOCKED.
+  // But backfilled rows stamped priceAtSignal = that day's REAL candle close
+  // (see backfillHistory: `priceAtSignal: day.close`) — so the rows
+  // themselves ARE the close series. Reconstruct from them, plus today's
+  // live price (overview is DexScreener-backed, reachable through outages)
+  // as today's partial close — the exact semantics the live-candle path uses
+  // when it resolves yesterday against today's forming candle.
+  if (closeMap.size === 0) {
+    for (const s of signals) {
+      if (s.backfilled && s.priceAtSignal > 0) closeMap.set(s.date, s.priceAtSignal)
+    }
+    try {
+      const overview = await getMarketOverview()
+      const today = utcDate()
+      if (overview.priceUsd > 0 && !closeMap.has(today)) closeMap.set(today, overview.priceUsd)
+    } catch {
+      // no live price either — resolve what the rows alone can
+    }
+  }
 
   const entries: HistoryEntry[] = signals.map((s) => {
     // Next trading day = the next calendar day with a known close.

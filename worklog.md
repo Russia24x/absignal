@@ -1142,3 +1142,22 @@ Stage Summary:
 - The chart/track-record/backtest outage class is fixed at the root: one successful upstream fetch per timeframe is durable FOREVER (historical candles are immutable), so intermittent GT blocking of the shared Workers egress IP can no longer blank the chart, zero the stats, or kill the backtest — worst case is a stale-flagged chart during long outages.
 - Production bootstrap: the remote CandleCache table auto-creates on first candle request; stats/chart restore the moment one GT window lets a fetch through (observed windows: 09:00, 09:27 UTC today).
 - Owner-facing behavior: nothing to configure, nothing to migrate — self-healing by design.
+
+---
+Task ID: 37
+Agent: orchestrator (main)
+Task: Continuation of R36 — GT stayed blocked for the Worker egress for 40+ minutes (12+25 polls), so "wait for a window" was not acceptable. Make the track record and the chart work through arbitrarily long outages.
+
+Work Log:
+- TEST-HARNESS BUG FOUND & FIXED (invalidated one earlier test): `pkill -f 'next dev'` does NOT kill `next-server` (which holds port 3000) — the "new" server silently failed to bind and the OLD one (pre-outage env) kept serving. All R37 tests re-run with a correct kill (pkill -f next) + port-free verification. The earlier R36 outage evidence (stale:true candles / dexscreener / backtest-from-D1) was driven by a genuine transient GT failure from the sandbox and remains valid.
+- FIX 1 — track-record stats independence (daily.ts): when the live close series is empty (upstream down AND durable candle cache cold), reconstruct it from the rows themselves: backfilled rows' priceAtSignal IS that day's real candle close (backfill stamps day.close), plus today's live price (overview is DexScreener-backed) as today's partial close — the same semantics as resolving yesterday against today's forming candle. Verified under real conditions (dead GT + cleared CandleCache): stats {4 wins, 9 losses, 8 neutral, accuracy 30.77%} restored. The track record can never collapse to all-LOCKED/0-0-0 again.
+- FIX 2 — live price ticks (geckoterminal.ts + schema): new PriceTick table (auto-created, idempotent DDL); every FRESH overview fetch — primary OR DexScreener fallback — records one tick (DexScreener is reachable from the Workers egress through outages, so ticks keep flowing). buildSyntheticCandles() buckets ticks per timeframe (O=first, H=max, L=min, C=last, volume 0) as the last display tier when real OHLCV is unavailable: the chart fills from "now" forward instead of showing an empty canvas. Verified: 4 ticks → 4 stale-flagged 15m candles.
+- SIGNAL INTEGRITY GUARANTEE: getCandles() (engine/backtest/backfill path) now REFUSES synthetic candles (throws) — signals only ever compute from real OHLCV. Verified: /api/backtest → 502 during synthetic mode. /api/market/candles (display route) passes the new `synthetic` flag through for honest client handling.
+- Candle tiers now: GT → D1 real candle cache → D1 tick-synthetic (display only) → 502.
+- GATES: tsc 0 · lint 0 · e2e-auth 34/34 PASS 0 FAIL · normal path re-verified (60 fresh candles, synthetic:false) · dev server healthy.
+- Git: committing + pushing (no force, Rule 1).
+
+Stage Summary:
+- The three outage-sensitive surfaces are now independent of GT windows: price card (DexScreener, R35), track-record stats (row-chaining + live price, R37), chart (ticks accumulate forward + full history on first GT window via R36 durable cache). Engine integrity preserved — synthetic data never feeds signals.
+- Production rollout: stats restore immediately on the next /api/signal/history hit (deterministic, no window needed); ticks start accumulating on the first overview fetch; the chart's full historical depth appears at the first GT window.
+- Remaining known limit: intraday chart depth during a >45s outage starts from zero ticks (builds forward); durable full-history needs one GT window per timeframe. Durable-fix options unchanged (paid GT key / GECKOTERMINAL_BASE_URL proxy).
