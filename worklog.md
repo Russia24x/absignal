@@ -1161,3 +1161,21 @@ Stage Summary:
 - The three outage-sensitive surfaces are now independent of GT windows: price card (DexScreener, R35), track-record stats (row-chaining + live price, R37), chart (ticks accumulate forward + full history on first GT window via R36 durable cache). Engine integrity preserved — synthetic data never feeds signals.
 - Production rollout: stats restore immediately on the next /api/signal/history hit (deterministic, no window needed); ticks start accumulating on the first overview fetch; the chart's full historical depth appears at the first GT window.
 - Remaining known limit: intraday chart depth during a >45s outage starts from zero ticks (builds forward); durable full-history needs one GT window per timeframe. Durable-fix options unchanged (paid GT key / GECKOTERMINAL_BASE_URL proxy).
+
+---
+Task ID: 37-b
+Agent: orchestrator (main)
+Task: R37 live verification + full-section QA (owner: "check the other sections too").
+
+Work Log:
+- CI green on ed97dee (build 10:56:18Z, success). Live verification:
+  - /api/signal/history → stats {4, 9, 8, 30.77%} RESTORED with GT still blocked (row-chaining + live DexScreener price — deterministic, no window needed). 21/22 rows resolved.
+  - Ticks accumulating: ~10 min of polling → /api/market/candles?tf=15m returns 2 synthetic candles (stale:true, synthetic:true) built from real observed DexScreener prices → THE CHART HAS DATA through a total GT outage.
+  - Browser QA (agent-browser): hero $0.00899 · stats UI shows 4 wins / 9 losses / 31% accuracy · chart canvas rendered (7 canvases, pixels present) · console 0 errors. Screenshot: download/r37-live-chart.png.
+- FULL-SECTION QA (live, earlier in the round): terminal tabs — alerts (live price, creates alerts), risk calculator (auto-fills live price) · track record (calendar + table) · FAQ accordion · language toggle EN/FA · wallet modal (email/Google/wallet options all render) · mobile 390px no overflow. Screenshots: r36-wallet-modal.png, r36-mobile.png.
+- GT window watch: 45+ minutes continuously blocked at press time; the system no longer depends on it for anything user-visible. Full historical chart depth lands automatically at the first window (R36 durable cache); until then the chart builds forward from live ticks.
+
+Stage Summary:
+- Owner's two complaints resolved: chart works (live-observed candles through outages, full history at first GT window), all other sections verified working.
+- Production state: price card live (dual-source) · track record honest and fully resolved (4/9/8, 30.77%) · chart alive · paywall/sessions/auth intact (34/34 e2e) · zero console errors.
+- Remaining known limits (documented in DEPLOYMENT.md §8): intraday chart depth builds forward during outages; full depth needs one GT window per timeframe; durable fixes if ever wanted: paid GT key or GECKOTERMINAL_BASE_URL proxy.
