@@ -21,6 +21,7 @@
  */
 
 import { marketConfig } from '@/lib/config'
+import { Prisma } from '@prisma/client'
 
 export interface Candle {
   time: number // unix seconds
@@ -382,15 +383,188 @@ export interface CandlesWithMeta {
   fetchedAt: number
 }
 
-/** Fetch OHLCV candles (USD-denominated) for a timeframe, with cache meta. */
+/* --------------------- durable candle cache (R36) --------------------- */
+
+/**
+ * D1/SQLite-backed candle persistence.
+ *
+ * Ground truth (R34/R35 diag from the deployed Worker): GeckoTerminal's OHLCV
+ * endpoint intermittently hard-limits (429) the shared Cloudflare Workers
+ * egress IP for minutes at a time, while the same pool's data is fine from
+ * other IPs. Historical candles are immutable, so persisting every successful
+ * fetch makes one open window last forever: the chart, the track record's
+ * outcome resolution (daily closes), and the backtest replay all survive
+ * upstream outages instead of blanking out.
+ *
+ * Everything here is best-effort and fail-safe: a cache that cannot be
+ * written or read must NEVER break the request path. The table is auto-created
+ * on first use (CREATE TABLE IF NOT EXISTS) so production needs no manual
+ * migration; dev/e2e SQLite gets it from `prisma db push`.
+ */
+const CANDLE_TABLE_DDL = `
+CREATE TABLE IF NOT EXISTS "CandleCache" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "pool" TEXT NOT NULL,
+  "tf" TEXT NOT NULL,
+  "time" INTEGER NOT NULL,
+  "open" REAL NOT NULL,
+  "high" REAL NOT NULL,
+  "low" REAL NOT NULL,
+  "close" REAL NOT NULL,
+  "volume" REAL NOT NULL,
+  "updatedAt" INTEGER NOT NULL
+)`
+
+let candleTableReady = false
+
+async function ensureCandleTable(): Promise<boolean> {
+  if (candleTableReady) return true
+  try {
+    const { getDb } = await import('@/lib/db')
+    const db = await getDb()
+    await db.$executeRawUnsafe(CANDLE_TABLE_DDL)
+    await db.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "CandleCache_pool_tf_time_idx" ON "CandleCache" ("pool", "tf", "time")`
+    )
+    candleTableReady = true
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Persist a successful fetch. Insert-only for old buckets (immutable),
+ * plus an update for the newest (still-forming) bucket. Chunked to stay
+ * under SQLite's bound-variable limit. */
+async function persistCandles(tf: Timeframe, candles: Candle[]): Promise<void> {
+  if (candles.length === 0) return
+  if (!(await ensureCandleTable())) return
+  try {
+    const { getDb } = await import('@/lib/db')
+    const db = await getDb()
+    const pool = marketConfig.pool
+    // Seconds — Prisma's Int is 32-bit; epoch ms overflows it.
+    const updatedAt = Math.floor(Date.now() / 1000)
+    const rows = candles.map((c) => ({
+      id: `${pool}:${tf}:${c.time}`,
+      pool,
+      tf,
+      time: c.time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume,
+      updatedAt,
+    }))
+    for (let i = 0; i < rows.length; i += 50) {
+      const chunk = rows.slice(i, i + 50)
+      await db.$executeRaw`
+        INSERT OR IGNORE INTO "CandleCache"
+          ("id", "pool", "tf", "time", "open", "high", "low", "close", "volume", "updatedAt")
+        VALUES ${Prisma.join(
+          chunk.map(
+            (r) => Prisma.sql`(${r.id}, ${r.pool}, ${r.tf}, ${r.time}, ${r.open}, ${r.high}, ${r.low}, ${r.close}, ${r.volume}, ${r.updatedAt})`
+          )
+        )}`
+    }
+    // The newest bucket is still forming — refresh it (INSERT OR IGNORE
+    // skipped it if it already existed).
+    const tail = rows[rows.length - 1]
+    await db.candleCache
+      .update({
+        where: { id: tail.id },
+        data: {
+          open: tail.open,
+          high: tail.high,
+          low: tail.low,
+          close: tail.close,
+          volume: tail.volume,
+          updatedAt,
+        },
+      })
+      .catch(() => {})
+  } catch {
+    // Best-effort durability — never break the request path.
+  }
+}
+
+/** Read the durable cache for a timeframe (newest `limit` buckets). */
+async function readPersistedCandles(tf: Timeframe, limit: number): Promise<Candle[]> {
+  if (!(await ensureCandleTable())) return []
+  try {
+    const { getDb } = await import('@/lib/db')
+    const db = await getDb()
+    const rows = await db.candleCache.findMany({
+      where: { pool: marketConfig.pool, tf },
+      orderBy: { time: 'desc' },
+      take: limit,
+    })
+    return rows
+      .reverse()
+      .map((r) => ({ time: r.time, open: r.open, high: r.high, low: r.low, close: r.close, volume: r.volume }))
+  } catch {
+    return []
+  }
+}
+
+/** While serving the D1 fallback, retry the live upstream at most this often. */
+const D1_FALLBACK_TTL_MS = 30_000
+
+/** Fetch OHLCV candles (USD-denominated) for a timeframe, with cache meta.
+ *
+ * Flow: memory cache → GeckoTerminal (persist to D1 on success) → D1 durable
+ * fallback (stale-flagged, short memory TTL so the upstream is retried soon).
+ * This is a dedicated orchestrator (not fetchCached) because the D1 fallback
+ * must be marked `stale: true` and cached with a shorter TTL. */
 export async function getCandlesWithMeta(tf: Timeframe, limit = 200): Promise<CandlesWithMeta> {
   const key = `candles:${tf}:${limit}`
-  const { value, stale, fetchedAt } = await fetchCached<Candle[]>(
-    key,
-    TF_TTL_MS[tf],
-    () => fetchCandles(tf, limit)
-  )
-  return { candles: value, stale, fetchedAt }
+  const hit = cache.get(key)
+  const now = Date.now()
+  if (hit && hit.expiresAt > now) {
+    return { candles: hit.value as Candle[], stale: false, fetchedAt: hit.fetchedAt }
+  }
+
+  const existing = inflight.get(key)
+  if (existing) return existing as Promise<CandlesWithMeta>
+
+  const task = (async (): Promise<CandlesWithMeta> => {
+    try {
+      // Respect the global upstream budget — unless we have nothing to serve.
+      if (!takeToken() && hit) {
+        return { candles: hit.value as Candle[], stale: true, fetchedAt: hit.fetchedAt }
+      }
+      try {
+        const candles = await fetchCandles(tf, limit)
+        const fetchedAt = Date.now()
+        cache.set(key, { value: candles, fetchedAt, expiresAt: fetchedAt + TF_TTL_MS[tf] })
+        trimCache()
+        await persistCandles(tf, candles)
+        return { candles, stale: false, fetchedAt }
+      } catch (err) {
+        if (hit) {
+          return { candles: hit.value as Candle[], stale: true, fetchedAt: hit.fetchedAt }
+        }
+        // Durable fallback (R36): upstream is failing AND the memory cache is
+        // cold (fresh isolate / expired) — serve what past successful fetches
+        // persisted, honestly flagged stale, with a short TTL so the upstream
+        // is retried promptly once the outage window passes.
+        const persisted = await readPersistedCandles(tf, limit)
+        if (persisted.length > 0) {
+          const fetchedAt = Date.now()
+          cache.set(key, { value: persisted, fetchedAt, expiresAt: fetchedAt + D1_FALLBACK_TTL_MS })
+          trimCache()
+          return { candles: persisted, stale: true, fetchedAt }
+        }
+        throw err
+      }
+    } finally {
+      inflight.delete(key)
+    }
+  })()
+
+  inflight.set(key, task)
+  return task
 }
 
 /** Value-only variant for the analysis engine / signal service. */

@@ -158,7 +158,10 @@ export function planIdForDays(days: number | null): SubscriptionPackageId {
 export const marketConfig = {
   network: process.env.GECKOTERMINAL_NETWORK || 'abstract',
   pool: (process.env.GECKOTERMINAL_POOL || '').toLowerCase(),
-  baseUrl: 'https://api.geckoterminal.com/api/v2',
+  // Override with GECKOTERMINAL_BASE_URL to route upstream calls through a
+  // self-hosted proxy (useful if the shared Workers egress IP stays
+  // rate-limited — see DEPLOYMENT.md §8).
+  baseUrl: process.env.GECKOTERMINAL_BASE_URL || 'https://api.geckoterminal.com/api/v2',
   // Free tier: ~30 req/min. We cache aggressively server-side and cap
   // upstream calls with a token bucket (see lib/market/geckoterminal.ts).
   priceTtlMs: 45_000,

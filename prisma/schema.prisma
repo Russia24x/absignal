@@ -115,6 +115,31 @@ model DailySignal {
   @@index([date])
 }
 
+/// Durable OHLCV cache (R36): candles fetched from the upstream are persisted
+/// so charts, the track record's outcome resolution, and backtests survive
+/// upstream outages (GeckoTerminal intermittently rate-limits the shared
+/// Cloudflare Workers egress IP). Historical buckets are immutable, so one
+/// successful fetch is durable forever. On D1 the table is ALSO auto-created
+/// at runtime (CREATE TABLE IF NOT EXISTS — see lib/market/geckoterminal.ts);
+/// this model exists so dev/e2e SQLite and the remote D1 stay in lockstep.
+model CandleCache {
+  /// Natural key "{pool}:{tf}:{time}"
+  id        String @id
+  pool      String
+  tf        String
+  /// Bucket start, unix seconds
+  time      Int
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float
+  /// Last refresh of this row, unix SECONDS (Int is 32-bit — ms overflows)
+  updatedAt Int
+
+  @@index([pool, tf, time])
+}
+
 /// LEGACY (pre-v2 tariff): per-user per-day unlocks bought with 1 PENGU.
 /// Kept as an audit trail of old day-passes; the new tariff is purely
 /// time-based (see lib/config.ts subscriptionPackages).

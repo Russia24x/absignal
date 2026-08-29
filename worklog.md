@@ -1121,3 +1121,24 @@ Stage Summary:
 - The production no-data epic (owner reports R31→R35) is CLOSED: root causes were (in order) missing runtime vars (owner fixed — runtime scope + encrypted secret), GeckoTerminal soft-limiting the shared Workers egress IP (fixed for the price card via DexScreener fallback; hardened everywhere with retry + payload validation), and the empty-200 cache-poisoning (fixed in R34).
 - Durable-fix options left to the owner (documented): GeckoTerminal paid API key for guaranteed OHLCV budget, treasury funding, optional SESSION_SECRET rotation (value was pasted in chat), custom domain.
 - Next-round candidates: allowedDevOrigins dev fix, backfill-guard hardening, prisma preview-flag cleanup, token rotation.
+
+---
+Task ID: 36
+Agent: orchestrator (main)
+Task: Owner report (Persian): "چارت هم کار نمیکنه بقیه قسمت ها رو هم چک کن" — the chart is broken, check all the other sections too.
+
+Work Log:
+- SYNC CHECK (Rule 2): clean — local == origin/main @ 8968ba8 (R35-b).
+- LIVE SWEEP: chart endpoint 502s on all timeframes (GT OHLCV blocked from the Worker egress — known R34/R35 issue). WORSE: the track record had degraded to 22 entries all-LOCKED, stats {0 wins, 0 losses, accuracy null} — because getSignalHistory re-resolves outcomes LIVE from getDailyCloses on every request, and GT being blocked ⇒ empty closes ⇒ every outcome PENDING ⇒ every row masked LOCKED. Backtest also dead (needs 300 daily candles; multiple sequential 15s-timeout fetches). Root cause for all three: single fragile upstream (GT OHLCV) with no durable storage.
+- FIX — durable candle cache (D1/SQLite): new `CandleCache` Prisma model (id "{pool}:{tf}:{time}", ohlcv floats, updatedAt in SECONDS — Int is 32-bit, epoch-ms overflows it; bitten and fixed during testing). getCandlesWithMeta rewritten as a dedicated orchestrator: memory cache → GT (on success: persist via parameterized `INSERT OR IGNORE` chunks of 50 + update the still-forming tail bucket) → on failure: read newest N buckets from the durable cache, serve with `stale: true` and a 30s memory TTL so the upstream is retried promptly. Table AUTO-CREATES at runtime (CREATE TABLE IF NOT EXISTS + index, module-level ready flag) — no owner migration needed; dev/e2e SQLite gets it from db:push. Every D1 op is fail-safe (try/catch → cache never breaks the request path).
+- Also: `GECKOTERMINAL_BASE_URL` env override added to marketConfig (+ .env.example) — routes upstream through a self-hosted proxy if the egress IP ever stays blocked; doubles as the outage-simulation hook for testing.
+- OUTAGE SIMULATION (end-to-end, via GECKOTERMINAL_BASE_URL=http://127.0.0.1:9/ + dev restart = cold isolate): candles → 60 served from D1, stale:true ✅; history → stats {4 wins, 9 losses, 8 neutral, accuracy 30.77%} restored from D1 daily closes ✅; overview → source:dexscreener ✅; backtest → full replay from 182 persisted candles ✅ (after populating with limit=300 — GT only has ~182 daily candles for this pool). Normal path re-verified after restore (fresh, stale:false).
+- FOUND & FIXED DURING TEST: (1) Prisma `skipDuplicates` is not supported on SQLite → switched to raw `INSERT OR IGNORE` with Prisma.sql/Prisma.join (works on both SQLite dev and D1); (2) epoch-ms updatedAt overflowed Prisma's 32-bit Int reads ("Conversion failed: Value … does not fit in an INT column") → seconds.
+- DOCS: DEPLOYMENT.md §8 +1 troubleshooting row (intermittent chart/stats degradation — self-healing explained, durable-fix options); .env.example documents GECKOTERMINAL_BASE_URL.
+- GATES: tsc 0 · lint 0 · e2e-auth 34/34 PASS 0 FAIL (clean single run) · dev server healthy.
+- Git: committing + pushing (no force, Rule 1). CI deploy carries the durable cache live.
+
+Stage Summary:
+- The chart/track-record/backtest outage class is fixed at the root: one successful upstream fetch per timeframe is durable FOREVER (historical candles are immutable), so intermittent GT blocking of the shared Workers egress IP can no longer blank the chart, zero the stats, or kill the backtest — worst case is a stale-flagged chart during long outages.
+- Production bootstrap: the remote CandleCache table auto-creates on first candle request; stats/chart restore the moment one GT window lets a fetch through (observed windows: 09:00, 09:27 UTC today).
+- Owner-facing behavior: nothing to configure, nothing to migrate — self-healing by design.
