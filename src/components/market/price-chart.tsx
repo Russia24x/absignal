@@ -169,7 +169,18 @@ export function PriceChart() {
   // Update data when candles arrive
   useEffect(() => {
     if (!seriesRef.current || !volumeRef.current || !data?.candles?.length) return
-    const candles = data.candles.map((c) => ({
+    // Client-side guard (R39): the chart must never crash regardless of what
+    // the API serves — sort ascending and collapse duplicate timestamps
+    // (lightweight-charts asserts on unordered/duplicate data).
+    const unique: typeof data.candles = []
+    for (const c of [...data.candles].sort((a, b) => a.time - b.time)) {
+      if (unique.length > 0 && unique[unique.length - 1].time === c.time) {
+        unique[unique.length - 1] = c
+      } else {
+        unique.push(c)
+      }
+    }
+    const candles = unique.map((c) => ({
       time: c.time as import('lightweight-charts').UTCTimestamp,
       open: c.open,
       high: c.high,
@@ -177,7 +188,7 @@ export function PriceChart() {
       close: c.close,
     }))
     seriesRef.current.setData(candles)
-    const volumes = data.candles.map((c) => ({
+    const volumes = unique.map((c) => ({
       time: c.time as import('lightweight-charts').UTCTimestamp,
       value: c.volume,
       color: c.close >= c.open ? 'rgba(61, 220, 151, 0.35)' : 'rgba(255, 107, 122, 0.35)',
@@ -185,8 +196,8 @@ export function PriceChart() {
     volumeRef.current.setData(volumes)
 
     // EMA overlays from real candle closes
-    const closes = data.candles.map((c) => c.close)
-    const times = data.candles.map((c) => c.time as import('lightweight-charts').UTCTimestamp)
+    const closes = unique.map((c) => c.close)
+    const times = unique.map((c) => c.time as import('lightweight-charts').UTCTimestamp)
     const buildEma = (period: number) => {
       const ema = emaSeries(closes, period)
       return times

@@ -19,6 +19,7 @@
  */
 
 import { binanceConfig } from '@/lib/config'
+import { normalizeSeries } from '@/lib/market/series'
 import type { Candle, MarketOverview, Timeframe } from '@/lib/market/geckoterminal'
 
 /** Hosts tried in order (unless pinned via BINANCE_BASE_URL). */
@@ -205,18 +206,19 @@ export async function fetchBinanceCandles(tf: Timeframe, limit: number): Promise
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error(`Binance klines ${interval} returned no candles`)
   }
-  return rows
-    .map((r) => ({
-      time: Math.floor(Number(r[0]) / 1000),
-      open: Number(r[1]),
-      high: Number(r[2]),
-      low: Number(r[3]),
-      close: Number(r[4]),
-      // Quote (USD) volume; fall back to base×close when absent.
-      volume: Number(r[7]) > 0 ? Number(r[7]) : Number(r[5]) * Number(r[4]),
-    }))
-    .filter((c) => Number.isFinite(c.close) && c.close > 0)
-    .sort((a, b) => a.time - b.time)
+  return normalizeSeries(
+    rows
+      .map((r) => ({
+        time: Math.floor(Number(r[0]) / 1000),
+        open: Number(r[1]),
+        high: Number(r[2]),
+        low: Number(r[3]),
+        close: Number(r[4]),
+        // Quote (USD) volume; fall back to base×close when absent.
+        volume: Number(r[7]) > 0 ? Number(r[7]) : Number(r[5]) * Number(r[4]),
+      }))
+      .filter((c) => Number.isFinite(c.close) && c.close > 0)
+  )
 }
 
 /** Durable-cache pool key for Binance-sourced candles (kept distinct from the

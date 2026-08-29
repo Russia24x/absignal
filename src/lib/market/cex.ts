@@ -31,6 +31,7 @@ import {
   fetchBinanceOverview,
   binancePoolKey,
 } from '@/lib/market/binance'
+import { normalizeSeries } from '@/lib/market/series'
 import type { Candle, MarketOverview, Timeframe } from '@/lib/market/geckoterminal'
 
 export type CexVenue = 'bybit' | 'okx' | 'mexc' | 'gate' | 'binance'
@@ -74,10 +75,12 @@ async function cexFetchJson(url: string, venue: CexVenue): Promise<unknown> {
   return res.json()
 }
 
-/** Normalize + validate a mapped candle list (positive prices, finite values). */
+/** Normalize + validate a mapped candle list (positive prices, finite values,
+ * ascending unique timestamps — upstreams occasionally emit duplicate buckets
+ * and lightweight-charts crashes on unordered data; see series.ts). */
 function toCandles(rows: Candle[]): Candle[] {
-  return rows
-    .filter(
+  return normalizeSeries(
+    rows.filter(
       (c) =>
         Number.isFinite(c.time) &&
         c.time > 0 &&
@@ -88,7 +91,7 @@ function toCandles(rows: Candle[]): Candle[] {
         Number.isFinite(c.low) &&
         Number.isFinite(c.volume)
     )
-    .sort((a, b) => a.time - b.time)
+  )
 }
 
 /* ------------------------------- Bybit (v5) -------------------------------- */

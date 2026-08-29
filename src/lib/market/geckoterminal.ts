@@ -30,6 +30,7 @@ import {
   type CexVenue,
 } from '@/lib/market/cex'
 import { fetchCmcOverview } from '@/lib/market/coinmarketcap'
+import { normalizeSeries } from '@/lib/market/series'
 
 export interface Candle {
   time: number // unix seconds
@@ -392,17 +393,18 @@ async function fetchCandles(tf: Timeframe, limit: number): Promise<Candle[]> {
   if (list.length === 0) {
     throw new Error(`GeckoTerminal ohlcv/${timeframe} returned no candles`)
   }
-  return list
-    .map((row) => ({
-      time: Number(row[0]),
-      open: Number(row[1]),
-      high: Number(row[2]),
-      low: Number(row[3]),
-      close: Number(row[4]),
-      volume: Number(row[5]),
-    }))
-    .filter((c) => Number.isFinite(c.close) && c.close > 0)
-    .sort((a, b) => a.time - b.time)
+  return normalizeSeries(
+    list
+      .map((row) => ({
+        time: Number(row[0]),
+        open: Number(row[1]),
+        high: Number(row[2]),
+        low: Number(row[3]),
+        close: Number(row[4]),
+        volume: Number(row[5]),
+      }))
+      .filter((c) => Number.isFinite(c.close) && c.close > 0)
+  )
 }
 
 export interface CandlesWithMeta {
