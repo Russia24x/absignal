@@ -1179,3 +1179,36 @@ Stage Summary:
 - Owner's two complaints resolved: chart works (live-observed candles through outages, full history at first GT window), all other sections verified working.
 - Production state: price card live (dual-source) · track record honest and fully resolved (4/9/8, 30.77%) · chart alive · paywall/sessions/auth intact (34/34 e2e) · zero console errors.
 - Remaining known limits (documented in DEPLOYMENT.md §8): intraday chart depth builds forward during outages; full depth needs one GT window per timeframe; durable fixes if ever wanted: paid GT key or GECKOTERMINAL_BASE_URL proxy.
+
+---
+Task ID: 38
+Agent: orchestrator (main)
+Task: Owner directive (Persian): "با کمک coin market cap و باینسس همه چیز رو اصلاح کن فالبک داشته باشیم" — wire CoinMarketCap + Binance into the market-data stack as fallbacks so every surface keeps working through upstream outages.
+
+Work Log:
+- Upstream verification from the sandbox: Binance public market data (data-api.binance.vision — the geo-unrestricted official host; api.binance.com as secondary) serves PENGUUSDT with 621 daily klines (GT has only ~182) + all our timeframes; CMC pro-api reachable but 401 without key (tier is key-gated by design). GT and Binance daily buckets both open at 00:00 UTC — bucket keys align, so a shared durable cache is coherent.
+- New: src/lib/market/binance.ts — keyless tier with multi-host failover (sticky preferred host), short retry on 429/5xx, payload validation (price>0 / non-empty klines), in-flight coalescing, 45s/2min TTL caches, dedicated 60/min token bucket. Ticker (24hr) → MarketOverview; klines → real OHLCV Candles (quote volume as USD volume, ms→s time).
+- New: src/lib/market/coinmarketcap.ts — optional tier armed only when COINMARKETCAP_API_KEY is set (quotes/latest, X-CMC_PRO_API_KEY header, 30/min bucket, same validation rules). No key → throws fast → chain skips it.
+- Orchestrator rewired (geckoterminal.ts):
+  - Overview chain: GT → DexScreener → Binance → CMC → stale-serving. persistTick now records ticks from EVERY fresh tier.
+  - Candles chain: GT → Binance (REAL OHLCV — the engine, backtest, and track-record close series now compute through GT outages; synthetic-refusal untouched because Binance is real market data) → merged D1 durable cache → tick-synthetic → 502.
+  - persistCandles gained a poolKey param: GT rows under the pool address, Binance rows under "binance:PENGUUSDT" — two independent durable series in the SAME table.
+  - readPersistedCandles merges both series: the source with the NEWEST bucket owns the tail (keeps OBV/volume-based reads single-source where it matters most), older gaps fill from the other.
+  - Cached candle payloads now carry their venue (CachedCandleSeries) so cache hits keep the chart badge stable instead of flickering.
+- Config: binanceConfig (BINANCE_SYMBOL default PENGUUSDT, BINANCE_BASE_URL pin/outage-simulation hook) + coinmarketcapConfig (+ COINMARKETCAP_SYMBOL/BASE_URL) + activeMarketSources() exposed via /api/config as marketSources (which tiers are armed + precedence chain). .env.example documents all knobs. All optional — validateConfig unchanged (no new failure modes).
+- UI: venue badge on the hero price pill (subtle uppercase whisper, title tooltip) and on the chart header next to the stale badge; i18n EN/FA (brand names stay Latin); /api/market/candles passes source through; use-app-data types updated.
+- TEST HARNESS: the sandbox reaper kills background processes when a tool call ends (even setsid/nohup/disown — verified with a sleep probe; a double-fork orphan SURVIVES). New scripts/dev-daemon.py: double-fork daemonizer that execs `next dev -p 3000` with output to dev.log — the dev server now persists across tool calls again (start/status).
+- OUTAGE SIMULATIONS (end-to-end, cold isolates):
+  - GT dead (127.0.0.1:9): overview → dexscreener ($0.009036) ✓; candles 1d/15m → binance REAL OHLCV 180/180, stale:false, source:binance ✓; backtest → 239 trading days, 26 trades (deep history unlocked by Binance's 621 dailies) ✓; history stats intact (4/9/8, 30.77%) ✓; today's signal LOCKED from the fallback path ✓; CandleCache now holds binance:PENGUUSDT rows (300×1d, 180×1h, 180×15m) alongside GT rows ✓.
+  - GT + Binance both dead: candles 1d → merged durable cache (stale:true, source:cache, 180 candles) ✓; 15m (cache cleared) → synthetic from ticks (7 candles, last close = live DexScreener price) ✓; overview → dexscreener ✓; backtest → 239 days from cache (real candles) ✓; history intact ✓.
+  - Normal path restored: overview/candles → geckoterminal, configOk:true, marketSources{gt,dex,binance:true, cmc:false} ✓.
+- BROWSER QA (agent-browser): hero price pill shows $0.00906 + change + "GECKOTERMINAL" venue badge ✓; chart header shows venue badge ✓; 15m tab switch works ✓; zero console errors ✓; full-page screenshot download/r38-live.png.
+- GATES: tsc 0 · lint 0 · e2e-auth 34/34 PASS 0 FAIL (two clean runs) · dev.log clean (only the known allowedDevOrigins warning).
+- Git: committed d3d6c1f + pushed (no force, Rule 1). CI deploys.
+
+Stage Summary:
+- The owner's directive is implemented at the root: every data surface now has a 3-4 deep fallback chain (Binance real OHLCV being the game-changer — signals, stats, backtests, and charts all compute from real market data even when GeckoTerminal is fully down, with no owner action required; CMC arms automatically if a COINMARKETCAP_API_KEY is ever set).
+- Durable-fix options for the owner are now effectively obsolete for availability (Binance is keyless and datacenter-friendly); remaining optional: COINMARKETCAP_API_KEY for a 4th price tier, paid GT key only for on-chain-purist signal sourcing.
+- Known limits: CMC tier unarmed until a key is set (by design); volume semantics differ per venue (DEX vs CEX quote volume) but each series is internally consistent and the merge policy keeps the analytical tail single-source.
+- NO 15-min cron was created (permanent owner directive at the top of this worklog).
+- Next-round candidates: allowedDevOrigins dev fix, token rotation, prisma preview-flag cleanup.
