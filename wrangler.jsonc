@@ -1,10 +1,11 @@
 {
         "$schema": "node_modules/wrangler/config-schema.json",
         "main": ".open-next/worker.js",
-        // Worker name MUST match the Cloudflare Workers Builds project name ("absignal").
-        // The CI overrides the name with the dashboard-configured one anyway, and
-        // WORKER_SELF_REFERENCE below must reference that same name (R30).
-        "name": "absignal",
+        // Worker name MUST match the Cloudflare Workers Builds project name.
+        // The owner renamed the project to the intended product name "pengusignal"
+        // in the Cloudflare dashboard (2026-08-29) — live at
+        // https://pengusignal.russia24x.workers.dev (R30 temporarily used "absignal").
+        "name": "pengusignal",
         "compatibility_date": "2026-08-28",
         "compatibility_flags": [
                 "nodejs_compat",
@@ -25,9 +26,9 @@
                 {
                         // Self-reference service binding, the service name must match the worker name
                         // see https://opennext.js.org/cloudflare/caching
-                        // Must be "absignal" — a mismatch made deploys fail with CF API error 10143 (R30)
+                        // Must equal `name` — a mismatch makes deploys fail with CF API error 10143 (R30/R31)
                         "binding": "WORKER_SELF_REFERENCE",
-                        "service": "absignal"
+                        "service": "pengusignal"
                 }
         ],
         "images": {

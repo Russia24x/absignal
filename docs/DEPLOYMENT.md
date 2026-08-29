@@ -95,8 +95,8 @@ free growth: portal ranking drives discovery.
 ## 1. One-time repo preparation (Cloudflare paths A & B)
 
 > ✅ **Status (R28): DONE and committed.** The repo already contains every
-> file below — `wrangler.jsonc` (worker `absignal` — renamed in R30 to match
-> the Workers Builds project name; D1 binding to the real
+> file below — `wrangler.jsonc` (worker `pengusignal` — the owner renamed the
+> Workers Builds project to the intended product name on 2026-08-29; D1 binding to the real
 > database `aa91256d-98f1-4d81-b294-2a34b0c4ebb3` created by the owner),
 > `open-next.config.ts`, `public/_headers`, `cloudflare-env.d.ts`, the D1
 > adapter wiring, and `migrations/0001_init.sql`. This section documents
@@ -318,21 +318,34 @@ Cloudflare runs the build in its own runners.
 
 | Setting | Value |
 |---|---|
-| Project name | `absignal` (becomes `absignal.<account>.workers.dev`) |
+| Project name | `pengusignal` (becomes `pengusignal.<account>.workers.dev`) |
 | Production branch | `main` |
 | Build command | `bun run deploy` |
 | Deploy command | — (already included in `bun run deploy`: `opennextjs-cloudflare build && opennextjs-cloudflare deploy`) |
 | Root directory | `/` |
 
 > ⚠️ **The project name MUST equal `name` and `WORKER_SELF_REFERENCE.service`
-> in `wrangler.jsonc`** (all three are `absignal`). Workers Builds overrides the
+> in `wrangler.jsonc`** (all three are `pengusignal`). Workers Builds overrides the
 > worker name with the dashboard-configured one — if the self-reference
 > binding points anywhere else, the deploy fails with Cloudflare API error
-> `10143` (this exact failure happened on the first CI deploy, fixed in R30).
+> `10143` (this exact failure happened on the first CI deploy — R30 fixed it
+> as `absignal`, R31 restored `pengusignal` after the owner renamed the
+> project in the dashboard). Renaming the Worker later also works — during
+> the rename the old URL 404s and requests flap (`error code: 1042`) until
+> the next deploy updates the self-reference.
 
 ### 3.4 Add variables & secrets (before first build)
 
 In the same setup screen → **Variables and Secrets**:
+
+> Scope tip: where the dashboard offers a per-variable scope, give the
+> `NEXT_PUBLIC_*` variables **Build and Deploy** (they are inlined into the
+> client bundle at build time AND read server-side at runtime);
+> runtime-only vars (`SESSION_SECRET`, `GECKOTERMINAL_*`, `SUBSCRIPTION_*`)
+> only need **Deploy**. Verify with `GET /api/config` → `configOk: true` —
+> `configErrors` lists exactly what is missing (a deploy without
+> `GECKOTERMINAL_POOL`/`SESSION_SECRET` leaves the site up but data-less —
+> see §8).
 
 | Type | Name | Value |
 |---|---|---|
@@ -371,7 +384,7 @@ npx wrangler d1 migrations apply pengusignal --remote
 
 - **Auto-deploy**: every push to `main` → new production deployment.
 - **Preview deployments**: pull-request branches get isolated
-  `<hash>.absignal.<account>.workers.dev` URLs (enable in
+  `<hash>.pengusignal.<account>.workers.dev` URLs (enable in
   *Settings → Builds → Branches*).
 - **Rollback**: *Deployments* tab → pick a green deployment → **Rollback**.
 - **Secrets**: *Settings → Variables and Secrets* → edit → **Save and deploy**
@@ -455,8 +468,9 @@ Run these **against the live URL** before announcing anything:
 | Symptom | Cause → fix |
 |---|---|
 | `config error` from every API route | `SESSION_SECRET` missing → set as encrypted secret, redeploy |
+| Site is up but data-less (`market_data_unavailable`, `history_unavailable`, no price) | runtime vars missing → check `GET /api/config` → `configErrors` (typically `GECKOTERMINAL_POOL` + `SESSION_SECRET`), set them, redeploy; if history still fails, apply the remote D1 migration (§3.5) |
 | Build fails on Workers Builds | §1 changes not committed/pushed (missing `wrangler.jsonc`) |
-| Deploy fails: `Service binding 'WORKER_SELF_REFERENCE' references Worker '…' which was not found [code: 10143]` | `name` / `WORKER_SELF_REFERENCE.service` in `wrangler.jsonc` ≠ the Workers Builds project name → set both to the project name (`absignal`, fixed in R30) |
+| Deploy fails: `Service binding 'WORKER_SELF_REFERENCE' references Worker '…' which was not found [code: 10143]` | `name` / `WORKER_SELF_REFERENCE.service` in `wrangler.jsonc` ≠ the Workers Builds project name → set both to the project name (now `pengusignal`; history: R30 `absignal` → R31 `pengusignal`) |
 | `P2010 / adapter` Prisma errors | `prisma generate` not run with `driverAdapters` + `queryCompiler`, or D1 binding name ≠ `DB` |
 | "Prisma Client could not locate the Query Engine" (on the worker) | `serverExternalPackages` missing `"@prisma/client", ".prisma/client"` in `next.config.ts`, or adapter major ≠ client major (needs 6.x with `@prisma/client@6`) → fix and rebuild |
 | ~50 `TS18046: … is of type 'unknown'` errors after regenerating types | `cloudflare-env.d.ts` was regenerated WITH runtime types → run `bun run cf-typegen` (which passes `--include-runtime=false`) |
@@ -467,4 +481,4 @@ Run these **against the live URL** before announcing anything:
 
 ---
 
-*Deployment target reference: Cloudflare Workers + OpenNext (`@opennextjs/cloudflare`), worker `absignal`, D1 database (`pengusignal`, id `aa91256d-98f1-4d81-b294-2a34b0c4ebb3`), free plan. Tested shapes: Next.js 16 App Router, Prisma 6 + `@prisma/adapter-d1` 6.x (WASM engine via workerd conditions), wagmi/AGW client-side. The full Workers stack — build, D1 queries, backfill, auth paywall — was validated locally with `bun run preview` (R28).*
+*Deployment target reference: Cloudflare Workers + OpenNext (`@opennextjs/cloudflare`), worker `pengusignal`, D1 database (`pengusignal`, id `aa91256d-98f1-4d81-b294-2a34b0c4ebb3`), free plan. Tested shapes: Next.js 16 App Router, Prisma 6 + `@prisma/adapter-d1` 6.x (WASM engine via workerd conditions), wagmi/AGW client-side. The full Workers stack — build, D1 queries, backfill, auth paywall — was validated locally with `bun run preview` (R28).*

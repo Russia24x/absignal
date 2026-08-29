@@ -1002,3 +1002,27 @@ Stage Summary:
 - The 10143 deploy blocker is fixed on main. The push auto-triggers a Workers Builds rebuild whose build stages were already green — the deploy step should now find a valid self-reference (`absignal` → `absignal`) and complete.
 - Remaining for the OWNER (unchanged, all runtime prerequisites): `npx wrangler d1 migrations apply pengusignal --remote` (if not run yet), `SESSION_SECRET` set as an encrypted secret in the Workers Builds variables, then the §6 post-deploy checklist against the live URL; fund the treasury when ready.
 - Next-round candidates (owner's call): allowedDevOrigins dev fix (preview interactivity), backfill-guard hardening, prisma preview-flag cleanup (deprecated warnings), token rotation after deploy work wraps up.
+
+---
+Task ID: 31
+Agent: orchestrator (main)
+Task: Owner feedback after first successful deploy: (a) they wanted the worker named `pengusignal` (CI project was `absignal`); (b) production showed no data (no price, no output). Diagnose live, realign config, deliver the fix runbook.
+
+Work Log:
+- SYNC CHECK (Rule 2): clean — local == origin/main @ 0a90e6f, ahead/behind 0/0.
+- LIVE DIAGNOSIS (curl against the deployed worker):
+  - /api/config → 200, configOk:false, configErrors: ["GECKOTERMINAL_POOL is not configured.", "SESSION_SECRET is missing or shorter than 32 chars."] — the owner DID set the NEXT_PUBLIC_* vars correctly (penguAddress + treasuryAddress resolve server-side; client chunks contain the inlined values → present at build time too).
+  - /api/market/overview → 502 {"error":"market_data_unavailable"} — empty pool kills every GeckoTerminal call → no price anywhere in the UI.
+  - /api/signal/history → 502 {"error":"history_unavailable"} — backfill cannot fetch candles (empty pool); remote D1 tables likely also missing (remote migration status unverifiable from the sandbox — no CF credentials).
+- MID-DIAGNOSIS EVENT: the site started flapping between bare "error code: 1042" bodies and Cloudflare "Page not found" 404s on every path — because the owner RENAMED the Workers Builds project `absignal` → `pengusignal` in the dashboard at that moment. Confirmed the outcome: https://pengusignal.russia24x.workers.dev now serves the app (root page 200, 12.4 KB SSR HTML, correct title + dir="rtl"; /api/config 200 stable ×3); the old absignal URL is dead (stable 404). The 1042s were purely the rename transition (old deployment's WORKER_SELF_REFERENCE → "absignal" dangling + workers.dev routing mid-flux).
+- R31 CONFIG REALIGN (urgent — with worker "absignal" gone, any CI build on the old config would 10143 forever): wrangler.jsonc `name` and `WORKER_SELF_REFERENCE.service` → `pengusignal` (exactly the R28-preview-validated identity); cloudflare-env.d.ts regenerated (binding comment /* pengusignal */); D1 database_name untouched (`pengusignal`, real).
+- DOCS: DEPLOYMENT.md — worker-name references restored to `pengusignal` (§1 status, §3.3 table + callout now documenting the rename/1042-transition behavior, §3.6 preview URLs, §8 10143 row, footer); §3.4 gains the variable-scope tip (NEXT_PUBLIC_* need Build and Deploy; runtime-only vars need Deploy; verify via /api/config configOk); §8 +1 troubleshooting row for "site up but data-less" (the exact symptom the owner hit: missing GECKOTERMINAL_POOL/SESSION_SECRET, plus remote D1 migration if history still fails).
+- Checked for Cloudflare's rename auto-PR on GitHub: refs/pull empty — nothing to clean up.
+- GATES: bun run typecheck → 0 errors · bun run lint → clean. Zero runtime-code changes (config strings + generated types + docs only).
+- Git: pre-push re-fetch confirmed remote unmoved at 0a90e6f → single commit, normal push, NO force (Rule 1). Push auto-triggers a Workers Builds run that should now be GREEN (project name == config name == self-reference == pengusignal).
+
+Stage Summary:
+- Worker identity RESOLVED: production lives at https://pengusignal.russia24x.workers.dev (page renders, API healthy) and the repo config matches it exactly; the CI build triggered by this push should be the first fully-green deploy.
+- "No data" root cause CONFIRMED as configuration-only — exactly TWO missing runtime vars: `GECKOTERMINAL_POOL` (kills all market data → no price) and `SESSION_SECRET` (kills sessions/auth/history). Remote D1 migration also still pending (owner-side command).
+- Owner runbook delivered (Persian): (1) add GECKOTERMINAL_POOL = 0xda7d037fda848177141e037f9d0c67cae7b53262 (Plain text) + SESSION_SECRET = openssl rand -hex 32 output (encrypted Secret) in the Worker's Variables and Secrets → Save and deploy; (2) `npx wrangler login && npx wrangler d1 migrations apply pengusignal --remote`; (3) confirm the CI build is green; (4) verify /api/config → configOk:true, /api/signal/history → ~21 rows, /api/market/overview → live price.
+- Next-round candidates (unchanged): allowedDevOrigins dev fix, backfill-guard hardening, prisma preview-flag cleanup, token rotation after deploy work wraps up.
