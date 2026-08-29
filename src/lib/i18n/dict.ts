@@ -59,6 +59,10 @@ export const dict = {
       sourceNames: {
         geckoterminal: 'GeckoTerminal',
         dexscreener: 'DexScreener',
+        bybit: 'Bybit',
+        okx: 'OKX',
+        mexc: 'MEXC',
+        gate: 'Gate.io',
         binance: 'Binance',
         coinmarketcap: 'CoinMarketCap',
         cache: 'durable cache',
@@ -532,6 +536,10 @@ export const dict = {
       sourceNames: {
         geckoterminal: 'GeckoTerminal',
         dexscreener: 'DexScreener',
+        bybit: 'Bybit',
+        okx: 'OKX',
+        mexc: 'MEXC',
+        gate: 'Gate.io',
         binance: 'Binance',
         coinmarketcap: 'CoinMarketCap',
         cache: 'کش دوام‌دار',

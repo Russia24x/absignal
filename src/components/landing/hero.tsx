@@ -3,9 +3,9 @@
 /**
  * Minimal hero: mascot → live price badge → headline → one sentence → two CTAs.
  * The price pill is the only live element; the mascot is the single brand mark.
- * R38: the pill also shows WHICH venue served the price (multi-source chain:
- * GeckoTerminal → DexScreener → Binance → CoinMarketCap) — honest data
- * provenance in a whisper-quiet label.
+ * R38/R39: the pill also shows WHICH venue served the price (multi-source
+ * chain: GeckoTerminal → DexScreener → Bybit/OKX/MEXC/Gate/Binance CEX tier →
+ * CoinMarketCap) — honest data provenance in a whisper-quiet label.
  */
 
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'

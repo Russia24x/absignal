@@ -32,12 +32,14 @@ export async function GET(req: Request) {
       network: marketConfig.network,
       pool: marketConfig.pool,
     },
-    // R38: multi-source fallback chain — which tiers are armed right now.
+    // R38/R39: multi-source fallback chain — which tiers are armed right now.
     marketSources: {
       ...activeMarketSources(),
       // Order = precedence (first success wins). CoinMarketCap only arms
-      // when COINMARKETCAP_API_KEY is set; Binance is keyless.
-      chain: ['geckoterminal', 'dexscreener', 'binance', 'coinmarketcap'],
+      // when COINMARKETCAP_API_KEY is set; the CEX venues are keyless.
+      // R39 ground truth: Binance 403s the Workers egress — the verified
+      // venues (bybit/okx/mexc/gate) carry the tier in production.
+      chain: ['geckoterminal', 'dexscreener', 'bybit', 'okx', 'mexc', 'gate', 'binance', 'coinmarketcap'],
       binanceSymbol: binanceConfig.symbol,
       coinmarketcapSymbol: coinmarketcapConfig.symbol,
     },

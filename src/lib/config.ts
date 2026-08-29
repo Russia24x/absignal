@@ -198,12 +198,38 @@ export const coinmarketcapConfig = {
   baseUrl: (process.env.COINMARKETCAP_BASE_URL || 'https://pro-api.coinmarketcap.com').replace(/\/+$/, ''),
 } as const
 
+/**
+ * Multi-venue CEX fallback tier (R39).
+ *
+ * Ground truth from the deployed Worker's own egress: Binance 403-blocks the
+ * shared Cloudflare Workers IPs on every host, while Bybit / OKX / MEXC /
+ * Gate.io answer 200 with real klines for PENGU from the same egress. Venue
+ * order below = measured reliability from the Workers egress; Binance stays
+ * last (works from other egresses). CEX_VENUES overrides the list (comma-
+ * separated); an empty value disables the whole tier (outage-simulation hook).
+ */
+export const cexConfig = {
+  venues: (process.env.CEX_VENUES ?? 'bybit,okx,mexc,gate,binance')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0),
+  bybitSymbol: (process.env.BYBIT_SYMBOL || 'PENGUUSDT').toUpperCase(),
+  okxSymbol: (process.env.OKX_SYMBOL || 'PENGU-USDT').toUpperCase(),
+  mexcSymbol: (process.env.MEXC_SYMBOL || 'PENGUUSDT').toUpperCase(),
+  gateSymbol: (process.env.GATE_SYMBOL || 'PENGU_USDT').toUpperCase(),
+} as const
+
 /** Which market-data sources are active right now (observability, /api/config). */
 export function activeMarketSources() {
+  const venues = cexConfig.venues
   return {
     geckoterminal: !!marketConfig.pool,
     dexscreener: true, // keyless on-chain fallback (R35)
-    binance: !!binanceConfig.symbol, // keyless CEX fallback (R38)
+    bybit: venues.includes('bybit') && !!cexConfig.bybitSymbol, // keyless CEX (R39)
+    okx: venues.includes('okx') && !!cexConfig.okxSymbol, // keyless CEX (R39)
+    mexc: venues.includes('mexc') && !!cexConfig.mexcSymbol, // keyless CEX (R39)
+    gate: venues.includes('gate') && !!cexConfig.gateSymbol, // keyless CEX (R39)
+    binance: venues.includes('binance') && !!binanceConfig.symbol, // keyless CEX (R38; 403 from Workers egress)
     coinmarketcap: !!coinmarketcapConfig.apiKey, // key-gated aggregator (R38)
   }
 }
