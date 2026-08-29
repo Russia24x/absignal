@@ -16,7 +16,8 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
-    "cf-typegen": "wrangler types --include-runtime=false --env-interface=CloudflareEnv cloudflare-env.d.ts"
+    "cf-typegen": "wrangler types --include-runtime=false --env-interface=CloudflareEnv cloudflare-env.d.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@abstract-foundation/agw-client": "^1.12.3",
