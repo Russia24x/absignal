@@ -7,6 +7,9 @@ import {
   treasuryAddress,
   subscriptionPackages,
   marketConfig,
+  binanceConfig,
+  coinmarketcapConfig,
+  activeMarketSources,
   validateConfig,
 } from '@/lib/config'
 
@@ -28,6 +31,15 @@ export async function GET(req: Request) {
       provider: 'GeckoTerminal',
       network: marketConfig.network,
       pool: marketConfig.pool,
+    },
+    // R38: multi-source fallback chain — which tiers are armed right now.
+    marketSources: {
+      ...activeMarketSources(),
+      // Order = precedence (first success wins). CoinMarketCap only arms
+      // when COINMARKETCAP_API_KEY is set; Binance is keyless.
+      chain: ['geckoterminal', 'dexscreener', 'binance', 'coinmarketcap'],
+      binanceSymbol: binanceConfig.symbol,
+      coinmarketcapSymbol: coinmarketcapConfig.symbol,
     },
     configOk: validation.ok,
     configErrors: validation.errors,

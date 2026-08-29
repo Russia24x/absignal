@@ -22,6 +22,12 @@
 
 import { marketConfig } from '@/lib/config'
 import { Prisma } from '@prisma/client'
+import {
+  fetchBinanceCandles,
+  fetchBinanceOverview,
+  binancePoolKey,
+} from '@/lib/market/binance'
+import { fetchCmcOverview } from '@/lib/market/coinmarketcap'
 
 export interface Candle {
   time: number // unix seconds
@@ -48,9 +54,9 @@ export interface MarketOverview {
   poolName: string | null
   baseSymbol: string | null
   updatedAt: number
-  /** Which upstream served this snapshot (geckoterminal primary, dexscreener
-   * fallback — R35). Display-only meta; the signal engine never reads it. */
-  source?: 'geckoterminal' | 'dexscreener'
+  /** Which upstream served this snapshot (R35: dexscreener; R38: binance +
+   * coinmarketcap tiers). Display-only meta; the signal engine never reads it. */
+  source?: 'geckoterminal' | 'dexscreener' | 'binance' | 'coinmarketcap'
 }
 
 export type Timeframe = '15m' | '1h' | '4h' | '1d'
@@ -325,17 +331,30 @@ export async function getMarketOverviewWithMeta(): Promise<OverviewWithMeta> {
     key,
     marketConfig.priceTtlMs,
     async () => {
-      let overview: MarketOverview
-      try {
-        overview = await fetchOverview()
-      } catch {
-        // GeckoTerminal is intermittently hard-limited from the shared Workers
-        // egress IP (R34/R35 ground truth) — fall back to DexScreener so the
-        // landing-page price card never goes dark. Engine paths do NOT use this.
-        overview = await fetchOverviewViaDexScreener()
+      // Multi-source fallback chain (R38 owner directive: CoinMarketCap +
+      // Binance). On-chain truth first, then keyless CEX, then the key-gated
+      // aggregator. Every tier validates its own payload (price > 0), so an
+      // empty body can never poison the cache. The chain degrades gracefully:
+      // the landing-page price card only goes dark if ALL sources fail.
+      const sources: Array<() => Promise<MarketOverview>> = [
+        fetchOverview,
+        fetchOverviewViaDexScreener,
+        fetchBinanceOverview,
+        fetchCmcOverview, // throws fast when no COINMARKETCAP_API_KEY is set
+      ]
+      let overview: MarketOverview | null = null
+      let lastErr: unknown = null
+      for (const src of sources) {
+        try {
+          overview = await src()
+          break
+        } catch (err) {
+          lastErr = err
+        }
       }
+      if (!overview) throw lastErr instanceof Error ? lastErr : new Error('all market sources failed')
       // R37: record a live observation for the synthetic-candle builder
-      // (works through outages via the DexScreener fallback).
+      // (works through outages via the DexScreener/Binance fallbacks).
       await persistTick(overview.priceUsd)
       return overview
     }
@@ -389,6 +408,8 @@ export interface CandlesWithMeta {
   /** R37: candles were synthesized from live price observations (ticks) —
    * display-only. The engine and backtests refuse synthetic candles. */
   synthetic?: boolean
+  /** R38: which venue served these candles — display/observability meta. */
+  source?: 'geckoterminal' | 'binance' | 'cache' | 'synthetic'
 }
 
 /* --------------------- durable candle cache (R36) --------------------- */
@@ -443,14 +464,16 @@ async function ensureCandleTable(): Promise<boolean> {
 
 /** Persist a successful fetch. Insert-only for old buckets (immutable),
  * plus an update for the newest (still-forming) bucket. Chunked to stay
- * under SQLite's bound-variable limit. */
-async function persistCandles(tf: Timeframe, candles: Candle[]): Promise<void> {
+ * under SQLite's bound-variable limit. Each source persists under its own
+ * pool key (GT pool address / "binance:SYMBOL") so the two series stay
+ * independent — one source's outage never overwrites the other's history. */
+async function persistCandles(tf: Timeframe, candles: Candle[], poolKey: string): Promise<void> {
   if (candles.length === 0) return
   if (!(await ensureCandleTable())) return
   try {
     const { getDb } = await import('@/lib/db')
     const db = await getDb()
-    const pool = marketConfig.pool
+    const pool = poolKey
     // Seconds — Prisma's Int is 32-bit; epoch ms overflows it.
     const updatedAt = Math.floor(Date.now() / 1000)
     const rows = candles.map((c) => ({
@@ -497,20 +520,43 @@ async function persistCandles(tf: Timeframe, candles: Candle[]): Promise<void> {
   }
 }
 
-/** Read the durable cache for a timeframe (newest `limit` buckets). */
+/** Read the durable cache for a timeframe (newest `limit` buckets).
+ *
+ * R38 multi-source merge: both the GT pool series and the Binance series are
+ * persisted; their bucket keys are identical (UTC-aligned boundaries) while
+ * the prices are arbitraged to equality. Policy: whichever source has the
+ * NEWEST bucket is the primary for the tail (indicators weight recent data
+ * most, and a single-source tail keeps volume-based reads like OBV coherent);
+ * older buckets missing from the primary are gap-filled from the other. */
 async function readPersistedCandles(tf: Timeframe, limit: number): Promise<Candle[]> {
   if (!(await ensureCandleTable())) return []
   try {
     const { getDb } = await import('@/lib/db')
     const db = await getDb()
-    const rows = await db.candleCache.findMany({
-      where: { pool: marketConfig.pool, tf },
-      orderBy: { time: 'desc' },
-      take: limit,
-    })
-    return rows
-      .reverse()
-      .map((r) => ({ time: r.time, open: r.open, high: r.high, low: r.low, close: r.close, volume: r.volume }))
+    const pools = [marketConfig.pool, binancePoolKey()]
+    const perPool = await Promise.all(
+      pools.map((pool) =>
+        db.candleCache
+          .findMany({ where: { pool, tf }, orderBy: { time: 'desc' }, take: limit })
+          .then((rows) => rows.map((r) => ({
+            time: r.time, open: r.open, high: r.high, low: r.low, close: r.close, volume: r.volume,
+          })))
+          .catch(() => [] as Candle[])
+      )
+    )
+    const [gtCandles, binanceCandles] = perPool as [Candle[], Candle[]]
+    if (gtCandles.length === 0) return binanceCandles.slice(-limit)
+    if (binanceCandles.length === 0) return gtCandles.slice(-limit)
+    // Choose the primary series by the newest bucket (after sorting asc).
+    const gtSorted = [...gtCandles].sort((a, b) => a.time - b.time)
+    const binSorted = [...binanceCandles].sort((a, b) => a.time - b.time)
+    const primaryIsBinance = binSorted[binSorted.length - 1].time >= gtSorted[gtSorted.length - 1].time
+    const primary = primaryIsBinance ? binSorted : gtSorted
+    const secondaryMap = new Map(
+      (primaryIsBinance ? gtSorted : binSorted).map((c) => [c.time, c])
+    )
+    const merged = primary.map((c) => secondaryMap.get(c.time) ?? c)
+    return merged.slice(-limit)
   } catch {
     return []
   }
@@ -625,16 +671,36 @@ const D1_FALLBACK_TTL_MS = 30_000
 
 /** Fetch OHLCV candles (USD-denominated) for a timeframe, with cache meta.
  *
- * Flow: memory cache → GeckoTerminal (persist to D1 on success) → D1 durable
- * fallback (stale-flagged, short memory TTL so the upstream is retried soon).
- * This is a dedicated orchestrator (not fetchCached) because the D1 fallback
- * must be marked `stale: true` and cached with a shorter TTL. */
+ * R38 multi-source chain (owner directive: Binance + CoinMarketCap fallbacks):
+ *
+ *   1. GeckoTerminal OHLCV — the on-chain pool, the signal source of record.
+ *      Persisted under the GT pool key.
+ *   2. Binance klines — REAL OHLCV from the deepest PENGU market (keyless,
+ *      not datacenter-hostile, 600+ daily candles). Persisted under the
+ *      "binance:SYMBOL" pool key. Real candles ⇒ the engine, the track-record
+ *      close series, and the backtest all keep working through GT outages
+ *      (synthetic refusal in getCandles is untouched — Binance is real data).
+ *   3. D1 durable cache — merged best-of-both series (see readPersistedCandles),
+ *      stale-flagged with a short memory TTL so the live sources are retried.
+ *   4. Tick-synthetic candles — display-only, refused by the engine.
+ *
+ * This is a dedicated orchestrator (not fetchCached) because the fallback
+ * tiers must be marked `stale: true` and cached with a shorter TTL. */
+
+/** Cached candle payloads carry their venue alongside the series, so cache
+ * hits keep the chart's source badge stable instead of flickering off. */
+interface CachedCandleSeries {
+  candles: Candle[]
+  source: NonNullable<CandlesWithMeta['source']>
+}
+
 export async function getCandlesWithMeta(tf: Timeframe, limit = 200): Promise<CandlesWithMeta> {
   const key = `candles:${tf}:${limit}`
   const hit = cache.get(key)
   const now = Date.now()
   if (hit && hit.expiresAt > now) {
-    return { candles: hit.value as Candle[], stale: false, fetchedAt: hit.fetchedAt }
+    const v = hit.value as CachedCandleSeries
+    return { candles: v.candles, stale: false, fetchedAt: hit.fetchedAt, source: v.source }
   }
 
   const existing = inflight.get(key)
@@ -644,43 +710,61 @@ export async function getCandlesWithMeta(tf: Timeframe, limit = 200): Promise<Ca
     try {
       // Respect the global upstream budget — unless we have nothing to serve.
       if (!takeToken() && hit) {
-        return { candles: hit.value as Candle[], stale: true, fetchedAt: hit.fetchedAt }
+        const v = hit.value as CachedCandleSeries
+        return { candles: v.candles, stale: true, fetchedAt: hit.fetchedAt, source: v.source }
       }
+      let firstErr: unknown = null
+      // Tier 1: GeckoTerminal (on-chain pool — source of record).
       try {
         const candles = await fetchCandles(tf, limit)
         const fetchedAt = Date.now()
-        cache.set(key, { value: candles, fetchedAt, expiresAt: fetchedAt + TF_TTL_MS[tf] })
+        cache.set(key, { value: { candles, source: 'geckoterminal' }, fetchedAt, expiresAt: fetchedAt + TF_TTL_MS[tf] })
         trimCache()
-        await persistCandles(tf, candles)
-        return { candles, stale: false, fetchedAt }
+        await persistCandles(tf, candles, marketConfig.pool)
+        return { candles, stale: false, fetchedAt, source: 'geckoterminal' }
       } catch (err) {
-        if (hit) {
-          return { candles: hit.value as Candle[], stale: true, fetchedAt: hit.fetchedAt }
-        }
-        // Durable fallback (R36): upstream is failing AND the memory cache is
-        // cold (fresh isolate / expired) — serve what past successful fetches
-        // persisted, honestly flagged stale, with a short TTL so the upstream
-        // is retried promptly once the outage window passes.
-        const persisted = await readPersistedCandles(tf, limit)
-        if (persisted.length > 0) {
-          const fetchedAt = Date.now()
-          cache.set(key, { value: persisted, fetchedAt, expiresAt: fetchedAt + D1_FALLBACK_TTL_MS })
-          trimCache()
-          return { candles: persisted, stale: true, fetchedAt }
-        }
-        // Last tier (R37): synthesize display-only candles from live price
-        // ticks (DexScreener-backed — keeps flowing through outages). The
-        // chart gets SOMETHING real instead of an empty canvas; the engine
-        // refuses synthetic candles (see getCandles).
-        const synthetic = await buildSyntheticCandles(tf, limit)
-        if (synthetic.length > 0) {
-          const fetchedAt = Date.now()
-          cache.set(key, { value: synthetic, fetchedAt, expiresAt: fetchedAt + D1_FALLBACK_TTL_MS })
-          trimCache()
-          return { candles: synthetic, stale: true, synthetic: true, fetchedAt }
-        }
-        throw err
+        firstErr = err
       }
+      // Tier 2 (R38): Binance klines — real OHLCV, keyless, deep history.
+      // Signals, stats, and backtests stay alive through GT outages because
+      // this tier is real market data, not synthetic ticks.
+      try {
+        const candles = await fetchBinanceCandles(tf, limit)
+        const fetchedAt = Date.now()
+        cache.set(key, { value: { candles, source: 'binance' }, fetchedAt, expiresAt: fetchedAt + TF_TTL_MS[tf] })
+        trimCache()
+        await persistCandles(tf, candles, binancePoolKey())
+        return { candles, stale: false, fetchedAt, source: 'binance' }
+      } catch {
+        // fall through to the durable tiers
+      }
+      if (hit) {
+        const v = hit.value as CachedCandleSeries
+        return { candles: v.candles, stale: true, fetchedAt: hit.fetchedAt, source: v.source }
+      }
+      // Tier 3: durable merged cache (R36 + R38 multi-source). Upstreams are
+      // failing AND the memory cache is cold — serve what past successful
+      // fetches persisted, honestly flagged stale, with a short TTL so the
+      // upstreams are retried promptly once the outage windows pass.
+      const persisted = await readPersistedCandles(tf, limit)
+      if (persisted.length > 0) {
+        const fetchedAt = Date.now()
+        cache.set(key, { value: { candles: persisted, source: 'cache' }, fetchedAt, expiresAt: fetchedAt + D1_FALLBACK_TTL_MS })
+        trimCache()
+        return { candles: persisted, stale: true, fetchedAt, source: 'cache' }
+      }
+      // Tier 4 (R37): synthesize display-only candles from live price ticks
+      // (DexScreener/Binance-backed — keep flowing through outages). The
+      // chart gets SOMETHING real instead of an empty canvas; the engine
+      // refuses synthetic candles (see getCandles).
+      const synthetic = await buildSyntheticCandles(tf, limit)
+      if (synthetic.length > 0) {
+        const fetchedAt = Date.now()
+        cache.set(key, { value: { candles: synthetic, source: 'synthetic' }, fetchedAt, expiresAt: fetchedAt + D1_FALLBACK_TTL_MS })
+        trimCache()
+        return { candles: synthetic, stale: true, synthetic: true, fetchedAt, source: 'synthetic' }
+      }
+      throw firstErr instanceof Error ? firstErr : new Error('all candle sources failed')
     } finally {
       inflight.delete(key)
     }
@@ -692,7 +776,9 @@ export async function getCandlesWithMeta(tf: Timeframe, limit = 200): Promise<Ca
 
 /** Value-only variant for the analysis engine / signal service.
  * REFUSES synthetic (tick-built) candles — signals and backtests must only
- * ever be computed from real OHLCV (signal-source integrity, R37). */
+ * ever be computed from real OHLCV (signal-source integrity, R37). Binance
+ * klines ARE real OHLCV from the deepest PENGU venue (R38), so the engine
+ * accepts them exactly like GT candles. */
 export async function getCandles(tf: Timeframe, limit = 200): Promise<Candle[]> {
   const { candles, synthetic } = await getCandlesWithMeta(tf, limit)
   if (synthetic) {

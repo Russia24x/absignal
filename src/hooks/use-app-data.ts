@@ -41,6 +41,9 @@ export interface MarketOverview {
   /** true when upstream is limited and cached data is being served */
   stale?: boolean
   fetchedAt?: number
+  /** R38: which venue served this snapshot (geckoterminal | dexscreener |
+   * binance | coinmarketcap) — display/observability meta. */
+  source?: string
 }
 
 export interface Candle {
@@ -187,7 +190,7 @@ export function useCandles(tf: string) {
   return useQuery({
     queryKey: ['candles', tf],
     queryFn: () =>
-      jget<{ timeframe: string; candles: Candle[]; stale?: boolean; fetchedAt?: number }>(
+      jget<{ timeframe: string; candles: Candle[]; stale?: boolean; fetchedAt?: number; synthetic?: boolean; source?: string }>(
         `/api/market/candles?tf=${tf}&limit=180`
       ),
     refetchInterval: 90_000,

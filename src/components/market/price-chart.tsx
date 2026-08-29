@@ -265,6 +265,16 @@ export function PriceChart() {
                 {tr.market.staleData}
               </Badge>
             )}
+            {data?.source && (
+              <Badge
+                variant="outline"
+                className="border-border text-muted-foreground text-[10px] gap-1"
+                title={`${tr.market.sourceVia} ${(tr.market.sourceNames as Record<string, string>)[data.source] ?? data.source}`}
+              >
+                <span aria-hidden className="size-1.5 rounded-full bg-bull/70" />
+                {(tr.market.sourceNames as Record<string, string>)[data.source] ?? data.source}
+              </Badge>
+            )}
           </CardTitle>
           <div className="flex items-center gap-1 rounded-xl bg-secondary/60 p-1" role="tablist" aria-label={tr.market.timeframe}>
             {TIMEFRAMES.map((item) => (

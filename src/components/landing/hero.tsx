@@ -3,6 +3,9 @@
 /**
  * Minimal hero: mascot → live price badge → headline → one sentence → two CTAs.
  * The price pill is the only live element; the mascot is the single brand mark.
+ * R38: the pill also shows WHICH venue served the price (multi-source chain:
+ * GeckoTerminal → DexScreener → Binance → CoinMarketCap) — honest data
+ * provenance in a whisper-quiet label.
  */
 
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
@@ -17,6 +20,9 @@ export function Hero() {
   const { data: market } = useMarketOverview()
   const change = market?.priceChange24h ?? null
   const positive = (change ?? 0) >= 0
+  const sourceName = market?.source
+    ? (t.market.sourceNames as Record<string, string>)[market.source]
+    : null
 
   return (
     <section id="top" className="pt-32 pb-16 sm:pt-40 sm:pb-20">
@@ -49,6 +55,17 @@ export function Hero() {
                 {positive ? '+' : ''}
                 {change.toFixed(2)}%
               </span>
+            )}
+            {sourceName && (
+              <>
+                <span aria-hidden className="h-3 w-px bg-border" />
+                <span
+                  className="text-[10px] uppercase tracking-wider text-muted-foreground/80"
+                  title={`${t.market.sourceVia} ${sourceName}`}
+                >
+                  {sourceName}
+                </span>
+              </>
             )}
           </div>
 

@@ -169,6 +169,45 @@ export const marketConfig = {
   historyTtlMs: 600_000,
 } as const
 
+/**
+ * Binance fallback source (R38) — keyless, real OHLCV for the engine.
+ *
+ * PENGU trades on Binance spot as PENGU/USDT with deep liquidity and full
+ * kline history (600+ daily candles vs GeckoTerminal's ~182). We default to
+ * `data-api.binance.vision`, Binance's official public market-data host that
+ * is NOT geo-restricted (api.binance.com answers 451 from some jurisdictions),
+ * and fail over to api.binance.com. BINANCE_BASE_URL pins a single host when
+ * set (also the outage-simulation hook for tests).
+ */
+export const binanceConfig = {
+  symbol: (process.env.BINANCE_SYMBOL || 'PENGUUSDT').toUpperCase(),
+  baseUrl: (process.env.BINANCE_BASE_URL || '').replace(/\/+$/, ''),
+} as const
+
+/**
+ * CoinMarketCap fallback source (R38) — aggregator quote, API-key gated.
+ *
+ * Optional: the CMC tier activates ONLY when COINMARKETCAP_API_KEY is set
+ * (free tier: 10k credits/day; quotes/latest costs 1 credit and our TTL cache
+ * keeps usage far below that). Serves price/24h-change/volume/market-cap —
+ * no per-pool DEX stats (liquidity/buy-sell counts are null on this tier).
+ */
+export const coinmarketcapConfig = {
+  apiKey: process.env.COINMARKETCAP_API_KEY || '',
+  symbol: (process.env.COINMARKETCAP_SYMBOL || 'PENGU').toUpperCase(),
+  baseUrl: (process.env.COINMARKETCAP_BASE_URL || 'https://pro-api.coinmarketcap.com').replace(/\/+$/, ''),
+} as const
+
+/** Which market-data sources are active right now (observability, /api/config). */
+export function activeMarketSources() {
+  return {
+    geckoterminal: !!marketConfig.pool,
+    dexscreener: true, // keyless on-chain fallback (R35)
+    binance: !!binanceConfig.symbol, // keyless CEX fallback (R38)
+    coinmarketcap: !!coinmarketcapConfig.apiKey, // key-gated aggregator (R38)
+  }
+}
+
 /** Session / auth configuration. */
 export const authConfig = {
   cookieName: 'pengu_session',
