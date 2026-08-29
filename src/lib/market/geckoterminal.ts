@@ -47,6 +47,9 @@ export interface MarketOverview {
   poolName: string | null
   baseSymbol: string | null
   updatedAt: number
+  /** Which upstream served this snapshot (geckoterminal primary, dexscreener
+   * fallback — R35). Display-only meta; the signal engine never reads it. */
+  source?: 'geckoterminal' | 'dexscreener'
 }
 
 export type Timeframe = '15m' | '1h' | '4h' | '1d'
@@ -230,6 +233,86 @@ async function fetchOverview(): Promise<MarketOverview> {
     poolName: a.name ?? null,
     baseSymbol: 'PENGU',
     updatedAt: Date.now(),
+    source: 'geckoterminal',
+  }
+}
+
+/* ------------------------- dexscreener fallback (R35) ------------------------ */
+
+/**
+ * DexScreener fallback for the price-card snapshot (display-only).
+ *
+ * Ground truth from the deployed Worker (R34 diag): GeckoTerminal intermittently
+ * hard-limits the shared Workers egress IP per endpoint — the OHLCV endpoint
+ * returns 429 `gt-error-code-429` for long stretches while its pool endpoint
+ * recovers — and it sometimes answers 200 with an empty body. DexScreener's
+ * token endpoint answered 200 with full data from the same Worker at the same
+ * moment. Same pool, same price, no key, no Cloudflare-internal throttling.
+ *
+ * Used ONLY for the overview: the signal engine, candles, and accuracy scoring
+ * stay on GeckoTerminal exclusively so locked signals never change source.
+ */
+async function fetchOverviewViaDexScreener(): Promise<MarketOverview> {
+  const pengu = (
+    marketConfig.network === 'abstract'
+      ? process.env.NEXT_PUBLIC_PENGU_MAINNET
+      : process.env.NEXT_PUBLIC_PENGU_TESTNET
+  )?.toLowerCase()
+  if (!pengu) throw new Error('DexScreener fallback: PENGU address not configured')
+
+  const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${pengu}`, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(12_000),
+  })
+  if (!res.ok) {
+    throw new Error(`DexScreener tokens failed: ${res.status}`)
+  }
+  const json: any = await res.json()
+  const pairs: any[] = Array.isArray(json?.pairs) ? json.pairs : []
+  if (pairs.length === 0) {
+    throw new Error('DexScreener returned no pairs')
+  }
+
+  // Prefer OUR pool (same address, same chain); else the deepest PENGU pair
+  // on the chain — the price is arbed to equality across pools.
+  const pair =
+    pairs.find(
+      (p) =>
+        String(p?.pairAddress ?? '').toLowerCase() === marketConfig.pool &&
+        p?.chainId === marketConfig.network
+    ) ??
+    pairs
+      .filter((p) => p?.chainId === marketConfig.network)
+      .sort((a, b) => (b?.liquidity?.usd ?? 0) - (a?.liquidity?.usd ?? 0))[0]
+  if (!pair) throw new Error('DexScreener: no pair on the configured network')
+
+  const priceUsd = Number(pair.priceUsd)
+  if (!(priceUsd > 0)) {
+    throw new Error('DexScreener payload has no positive price')
+  }
+
+  const num = (v: unknown): number | null => (v == null ? null : Number(v))
+  return {
+    priceUsd,
+    priceChange24h: num(pair.priceChange?.m24),
+    priceChange6h: num(pair.priceChange?.h6),
+    priceChange1h: num(pair.priceChange?.h1),
+    volume24hUsd: num(pair.volume?.h24),
+    volume6hUsd: num(pair.volume?.h6),
+    volume1hUsd: num(pair.volume?.h1),
+    liquidityUsd: num(pair.liquidity?.usd),
+    fdvUsd: num(pair.fdv),
+    marketCapUsd: num(pair.marketCap),
+    buys24h: num(pair.txns?.h24?.buys),
+    sells24h: num(pair.txns?.h24?.sells),
+    poolName:
+      pair.baseToken?.symbol && pair.quoteToken?.symbol
+        ? `${pair.baseToken.symbol} / ${pair.quoteToken.symbol}`
+        : null,
+    baseSymbol: 'PENGU',
+    updatedAt: Date.now(),
+    source: 'dexscreener',
   }
 }
 
@@ -240,7 +323,16 @@ export async function getMarketOverviewWithMeta(): Promise<OverviewWithMeta> {
   const { value, stale, fetchedAt } = await fetchCached<MarketOverview>(
     key,
     marketConfig.priceTtlMs,
-    fetchOverview
+    async () => {
+      try {
+        return await fetchOverview()
+      } catch {
+        // GeckoTerminal is intermittently hard-limited from the shared Workers
+        // egress IP (R34/R35 ground truth) — fall back to DexScreener so the
+        // landing-page price card never goes dark. Engine paths do NOT use this.
+        return await fetchOverviewViaDexScreener()
+      }
+    }
   )
   return { ...value, stale, fetchedAt }
 }

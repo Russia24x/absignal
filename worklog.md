@@ -1085,3 +1085,23 @@ Stage Summary:
 - R34 hardening deployed: $0.00-poisoning eliminated, transient upstream rejections absorbed by retry, stale-serving now actually protects the UI as designed.
 - Post-deploy live verification of the patch: [pending CI deploy — see R35 if anything remains]
 - Known environmental note: GeckoTerminal free tier vs shared Workers egress IP will keep occasionally soft-limiting; the app now degrades to stale-flagged data instead of zeros/errors. Next-level fixes if ever needed: paid API key, or a second-source fallback pool.
+
+---
+Task ID: 35
+Agent: orchestrator (main)
+Task: Continue R34 production-data verification — market endpoints still 502ing live despite the retry patch; get ground truth on what the Worker's outbound fetch actually receives, then make the landing-page price card reliable.
+
+Work Log:
+- DIAGNOSTIC INSTRUMENT (temporary, now removed): /api/market/diag route deployed to production — performs the Worker's own outbound fetches (GeckoTerminal pool, GeckoTerminal OHLCV, DexScreener tokens, cloudflare.com trace) and reports raw status/headers/body snippets.
+- GROUND TRUTH (from the deployed Worker, 09:27:50Z): GeckoTerminal pool endpoint → 200 with real data ($0.008976); GeckoTerminal OHLCV → **429 {"title":"Rate Limited","detail":"gt-error-code-429"}**; **DexScreener tokens → 200 with full data for the exact same pool** (same price, liquidity $441K); cloudflare trace baseline → 200 (Worker egress = shared IPv6 2a06:98c0:3600::/32, colo HKG). Conclusion: NOT a Cloudflare zone block — GeckoTerminal's own per-endpoint rate limiting hammers the shared Workers egress IP (contended by the whole CF fleet); the blocking is intermittent per endpoint, which matches every observation since R33 (worked 09:00-09:01, blocked 09:03-09:22, pool recovered by 09:27).
+- CryptoCompare evaluated as a candles fallback — now requires an API key (401 without), rejected.
+- FIX (R35): DexScreener fallback for the OVERVIEW (price-card snapshot, display-only) in src/lib/market/geckoterminal.ts — fetchOverviewViaDexScreener() maps /latest/dex/tokens/{PENGU} to MarketOverview (prefers our exact pool by pairAddress+chainId, else deepest PENGU pair on the chain; validates priceUsd>0); getMarketOverviewWithMeta() now tries GeckoTerminal, falls back to DexScreener on any failure. MarketOverview gains optional `source: 'geckoterminal'|'dexscreener'` meta. The signal engine, candles, and accuracy scoring stay GeckoTerminal-only — locked signals never change source, so NO ENGINE_VERSION bump.
+- FALLBACK TEST (forced): dev .env GECKOTERMINAL_POOL pointed at a garbage address → /api/market/overview returned source:dexscreener, priceUsd 0.008956, PENGU/WETH, liquidity $441K, vol24h $33.8K — fallback path proven end-to-end. Restored real pool → source:geckoterminal, price 0.008976 (primary path unaffected).
+- CLEANUP: temporary diag route deleted (outbound-fetch amplification vector — removed after extracting the ground truth).
+- GATES: tsc 0 · lint 0 · e2e-auth 34/34 PASS (single clean run after the 60s rate window; R34's lesson about back-to-back suite runs applied).
+- Git: committing + pushing (no force, Rule 1) — CI deploys the fallback.
+
+Stage Summary:
+- Landing-page price card is now dual-sourced: GeckoTerminal primary, DexScreener fallback — both verified working from the deployed Worker's own egress. The $0.00/error price-card failure mode is eliminated (R34 killed cache-poisoning; R35 kills the single-source dependency).
+- Candles (chart) and signal computation remain GeckoTerminal-only by design (signal-source integrity); they ride the intermittent windows with retry+cache+stale-serving. Durable fix options recorded for the owner: GeckoTerminal paid API key, or a future on-chain candle builder.
+- Post-deploy live verification: [pending CI — verified in R36 if anything remains]
