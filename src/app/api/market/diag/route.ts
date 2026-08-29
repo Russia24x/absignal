@@ -21,14 +21,15 @@ const PENGU = '0x9ebe3a824ca958e4b3da772d2065518f009cba62'
 interface Probe {
   name: string
   url: string
+  headers?: Record<string, string>
 }
+
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
 
 const PROBES: Probe[] = [
   { name: 'cf-trace', url: 'https://www.cloudflare.com/cdn-cgi/trace' },
-  {
-    name: 'gt-pool',
-    url: `https://api.geckoterminal.com/api/v2/networks/abstract/pools/${POOL}`,
-  },
+  { name: 'gt-pool', url: `https://api.geckoterminal.com/api/v2/networks/abstract/pools/${POOL}` },
   {
     name: 'gt-ohlcv-1d',
     url: `https://api.geckoterminal.com/api/v2/networks/abstract/pools/${POOL}/ohlcv/day?aggregate=1&limit=2&currency=usd`,
@@ -37,33 +38,58 @@ const PROBES: Probe[] = [
     name: 'dexscreener',
     url: `https://api.dexscreener.com/latest/dex/tokens/${PENGU}`,
   },
+  // ── Binance family: plain vs browser-UA vs futures host ──
   {
     name: 'binance-vision-klines',
     url: 'https://data-api.binance.vision/api/v3/klines?symbol=PENGUUSDT&interval=1d&limit=2',
   },
   {
-    name: 'binance-vision-ticker',
-    url: 'https://data-api.binance.vision/api/v3/ticker/24hr?symbol=PENGUUSDT',
+    name: 'binance-vision-klines-UA',
+    url: 'https://data-api.binance.vision/api/v3/klines?symbol=PENGUUSDT&interval=1d&limit=2',
+    headers: { 'User-Agent': BROWSER_UA },
   },
   {
-    name: 'binance-com-klines',
+    name: 'binance-com-klines-UA',
     url: 'https://api.binance.com/api/v3/klines?symbol=PENGUUSDT&interval=1d&limit=2',
+    headers: { 'User-Agent': BROWSER_UA },
   },
   {
-    name: 'binance-api1-klines',
-    url: 'https://api1.binance.com/api/v3/klines?symbol=PENGUUSDT&interval=1d&limit=2',
+    name: 'binance-fapi-klines',
+    url: 'https://fapi.binance.com/fapi/v1/klines?symbol=PENGUUSDT&interval=1d&limit=2',
+  },
+  // ── Alternative CEXes with PENGU listings, public klines ──
+  {
+    name: 'bybit-klines',
+    url: 'https://api.bybit.com/v5/market/kline?category=spot&symbol=PENGUUSDT&interval=D&limit=2',
   },
   {
-    name: 'binance-api2-klines',
-    url: 'https://api2.binance.com/api/v3/klines?symbol=PENGUUSDT&interval=1d&limit=2',
+    name: 'okx-candles',
+    url: 'https://www.okx.com/api/v5/market/candles?instId=PENGU-USDT&bar=1D&limit=2',
   },
   {
-    name: 'binance-api3-klines',
-    url: 'https://api3.binance.com/api/v3/klines?symbol=PENGUUSDT&interval=1d&limit=2',
+    name: 'kucoin-candles',
+    url: 'https://api.kucoin.com/api/v1/market/candles?symbol=PENGU-USDT&type=1day',
   },
   {
-    name: 'binance-api4-klines',
-    url: 'https://api4.binance.com/api/v3/klines?symbol=PENGUUSDT&interval=1d&limit=2',
+    name: 'gate-candles',
+    url: 'https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=PENGU_USDT&interval=1d&limit=2',
+  },
+  {
+    name: 'mexc-klines',
+    url: 'https://api.mexc.com/api/v3/klines?symbol=PENGUUSDT&interval=1d&limit=2',
+  },
+  {
+    name: 'coinbase-candles',
+    url: 'https://api.exchange.coinbase.com/products/PENGU-USD/candles?granularity=86400',
+    headers: { 'User-Agent': BROWSER_UA },
+  },
+  {
+    name: 'kraken-ohlc',
+    url: 'https://api.kraken.com/0/public/OHLC?pair=PENGUUSD',
+  },
+  {
+    name: 'coingecko-ping',
+    url: 'https://api.coingecko.com/api/v3/ping',
   },
   {
     name: 'cmc-quotes-nokey',
@@ -75,7 +101,7 @@ async function runProbe(p: Probe) {
   const started = Date.now()
   try {
     const res = await fetch(p.url, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...(p.headers ?? {}) },
       cache: 'no-store',
       signal: AbortSignal.timeout(8_000),
     })
