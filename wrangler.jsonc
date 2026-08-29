@@ -11,6 +11,20 @@
                 "nodejs_compat",
                 "global_fetch_strictly_public"
         ],
+        // R39: deploy-time runtime vars. `wrangler deploy` DELETES plain-text
+        // dashboard vars that are absent from this file (keep_vars unset) —
+        // that is exactly how GECKOTERMINAL_POOL vanished in production after
+        // the R38 deploy (configOk:false, GT tier disarmed, chart degraded).
+        // The pool address is public on-chain data, so it is versioned here to
+        // make every deploy deterministic: the GT tier can never be silently
+        // disarmed again. Secrets (SESSION_SECRET, optional
+        // COINMARKETCAP_API_KEY) stay in the dashboard — encrypted secrets
+        // survive deploys and never belong in the repo.
+        "keep_vars": true,
+        "vars": {
+                "GECKOTERMINAL_NETWORK": "abstract",
+                "GECKOTERMINAL_POOL": "0xda7d037fda848177141e037f9d0c67cae7b53262"
+        },
         "assets": {
                 "directory": ".open-next/assets",
                 "binding": "ASSETS"
