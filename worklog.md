@@ -983,3 +983,22 @@ Stage Summary:
 - Sandbox is now healthy AND synced: local == origin/main, dev server running (daemonized), real .env, populated 21-day track record.
 - Remaining for the OWNER (unchanged from R28): `npx wrangler d1 migrations apply pengusignal --remote`, `npx wrangler secret put SESSION_SECRET`, then deploy/connect GitHub; fund treasury when ready.
 - Next-round candidates (owner's call): allowedDevOrigins dev fix (preview interactivity), backfill-guard hardening, prisma preview-flag cleanup (deprecated warnings), token rotation after deploy work wraps up.
+
+---
+Task ID: 30
+Agent: orchestrator (main)
+Task: Cloudflare Workers Builds deploy fix — the first full CI build (owner pasted the log) passed EVERY build stage (R29's postinstall fix worked: bun install → prisma generate → next build + TypeScript 0 errors → OpenNext bundle → asset upload) but the final deploy step failed with CF API error 10143: "Service binding 'WORKER_SELF_REFERENCE' references Worker 'pengusignal' which was not found", plus a warning that the CI-expected worker name is `absignal` (config said `pengusignal`).
+
+Work Log:
+- SYNC CHECK (Rule 2): clean — local == origin/main @ a8fa95b, ahead/behind 0/0, working tree clean; token fetch OK (read permission verified).
+- ROOT CAUSE: the Workers Builds project is named `absignal` (dashboard-configured; CI force-overrides the worker name), and the account has no worker named `pengusignal` — so OpenNext's self-reference service binding pointed at a nonexistent worker and the CF API rejected the version upload. Verified in @opennextjs/cloudflare source what WORKER_SELF_REFERENCE is for: the `res-revalidate` build patch reroutes ISR background-revalidation HEAD requests through it, and memory-queue uses it too — it MUST stay, and its `service` must equal the deployed worker name (OpenNext's own template comment says so).
+- FIX (minimal, 2 values): wrangler.jsonc `name`: pengusignal → **absignal** and `services[WORKER_SELF_REFERENCE].service`: pengusignal → **absignal** (name == service invariant preserved, explanatory comments added). D1 `database_name: "pengusignal"` deliberately UNCHANGED — that database really exists and its binding validated fine in the CI log.
+- Regenerated `cloudflare-env.d.ts` via `bun run cf-typegen` — wrangler re-parsed the new config without complaint (syntax gate), the binding comment is now `/* absignal */`, and the file also picked up `NEXT_PUBLIC_SPONSOR_PAYMASTER_ADDRESS` + `NEXT_PUBLIC_ABSTRACT_APP_ID` (present in .dev.vars / §3.4's table, were missing from the R28-generated file).
+- DOCS: DEPLOYMENT.md — §1 status note (worker `absignal`, R30 rename), §3.3 corrected to the REAL dashboard settings (project name `absignal`, build command `bun run deploy`, deploy step included in it) + a ⚠️ callout that project name == wrangler name == WORKER_SELF_REFERENCE.service is a hard invariant (10143 otherwise), §3.6 preview URLs → absignal, §8 troubleshooting +1 row for 10143, footer reference now records the worker name.
+- GATES: `bun run typecheck` → 0 errors · `bun run lint` → clean. e2e intentionally not re-run: zero runtime-code changes (config + generated types + docs only; the 34/34 suite covers app behavior which is untouched).
+- Git: pre-push re-fetch confirmed remote still at a8fa95b → single commit, normal push, NO force (Rule 1).
+
+Stage Summary:
+- The 10143 deploy blocker is fixed on main. The push auto-triggers a Workers Builds rebuild whose build stages were already green — the deploy step should now find a valid self-reference (`absignal` → `absignal`) and complete.
+- Remaining for the OWNER (unchanged, all runtime prerequisites): `npx wrangler d1 migrations apply pengusignal --remote` (if not run yet), `SESSION_SECRET` set as an encrypted secret in the Workers Builds variables, then the §6 post-deploy checklist against the live URL; fund the treasury when ready.
+- Next-round candidates (owner's call): allowedDevOrigins dev fix (preview interactivity), backfill-guard hardening, prisma preview-flag cleanup (deprecated warnings), token rotation after deploy work wraps up.

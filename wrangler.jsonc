@@ -1,34 +1,38 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"main": ".open-next/worker.js",
-	"name": "pengusignal",
-	"compatibility_date": "2026-08-28",
-	"compatibility_flags": [
-		"nodejs_compat",
-		"global_fetch_strictly_public"
-	],
-	"assets": {
-		"directory": ".open-next/assets",
-		"binding": "ASSETS"
-	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "pengusignal",
-			"database_id": "aa91256d-98f1-4d81-b294-2a34b0c4ebb3"
-		}
-	],
-	"services": [
-		{
-			// Self-reference service binding, the service name must match the worker name
-			// see https://opennext.js.org/cloudflare/caching
-			"binding": "WORKER_SELF_REFERENCE",
-			"service": "pengusignal"
-		}
-	],
-	"images": {
-		// Enable image optimization
-		// see https://opennext.js.org/cloudflare/howtos/image
-		"binding": "IMAGES"
-	}
+        "$schema": "node_modules/wrangler/config-schema.json",
+        "main": ".open-next/worker.js",
+        // Worker name MUST match the Cloudflare Workers Builds project name ("absignal").
+        // The CI overrides the name with the dashboard-configured one anyway, and
+        // WORKER_SELF_REFERENCE below must reference that same name (R30).
+        "name": "absignal",
+        "compatibility_date": "2026-08-28",
+        "compatibility_flags": [
+                "nodejs_compat",
+                "global_fetch_strictly_public"
+        ],
+        "assets": {
+                "directory": ".open-next/assets",
+                "binding": "ASSETS"
+        },
+        "d1_databases": [
+                {
+                        "binding": "DB",
+                        "database_name": "pengusignal",
+                        "database_id": "aa91256d-98f1-4d81-b294-2a34b0c4ebb3"
+                }
+        ],
+        "services": [
+                {
+                        // Self-reference service binding, the service name must match the worker name
+                        // see https://opennext.js.org/cloudflare/caching
+                        // Must be "absignal" — a mismatch made deploys fail with CF API error 10143 (R30)
+                        "binding": "WORKER_SELF_REFERENCE",
+                        "service": "absignal"
+                }
+        ],
+        "images": {
+                // Enable image optimization
+                // see https://opennext.js.org/cloudflare/howtos/image
+                "binding": "IMAGES"
+        }
 }
