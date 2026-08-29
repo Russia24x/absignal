@@ -1046,3 +1046,19 @@ Stage Summary:
 - The owner's observability JSON is codified deploy-safe in wrangler.jsonc (validated against the exact wrangler 4.127.1 CI uses — the one unsupported key dropped with rationale).
 - Owner's side confirmed: remote D1 migration applied. STILL MISSING (the only thing between the owner and live production data): `GECKOTERMINAL_POOL` (plain Variable) + `SESSION_SECRET` (encrypted Secret) in the Workers Builds Variables → Save and deploy — then /api/config → configOk:true, market price + 21-row backfilled track record appear.
 - Next-round candidates (unchanged): allowedDevOrigins dev fix, backfill-guard hardening, prisma preview-flag cleanup, token rotation after deploy work wraps up.
+
+---
+Task ID: 33
+Agent: orchestrator (main)
+Task: Owner pasted their full Workers Builds Variables list (12 vars, all values matching DEPLOYMENT.md §3.4 exactly — GECKOTERMINAL_POOL, SESSION_SECRET and all NEXT_PUBLIC_*/SUBSCRIPTION_* present). Verify production went live with data; unblock whatever remains.
+
+Work Log:
+- SYNC CHECK (Rule 2): clean — local == origin/main @ 58ea10c (R32).
+- LIVE CHECK: /api/config STILL `configOk:false` with exactly GECKOTERMINAL_POOL + SESSION_SECRET missing → the owner's saved vars have NOT reached the deployed worker's runtime environment.
+- CI FORENSICS via GitHub API (check-runs on 58ea10c): "Workers Builds: pengusignal" completed **success**, started 2026-08-29T08:29:44Z — so a fresh green deployment IS live, yet it was built without the runtime vars. Conclusion: either the owner saved the vars after that build snapshot, or (classic gotcha) the vars' Scope is "Build" only — Build-scope vars are injected into the build env but NOT the deployed worker's runtime; note NEXT_PUBLIC_* appear to work either way because Next inlines them into both bundles at build time, so only the two runtime-read vars (GECKOTERMINAL_POOL, SESSION_SECRET — read via process.env at request time in src/lib/config.ts) expose the gap.
+- ACTION: pushed this worklog-only commit to trigger a fresh Workers Builds deploy — if the vars carry Deploy scope, this deployment applies them (no owner action needed).
+- SECURITY NOTES for the owner (relayed): (1) SESSION_SECRET is stored as a plain-text Variable — works identically, but the Secret (encrypted) type is the right one; (2) the owner pasted the actual SESSION_SECRET value into chat → recommend rotating it with `openssl rand -hex 32` once the site is confirmed working.
+
+Stage Summary:
+- Owner's variable list is 100% correct per §3.4 (values match). The only remaining question is scope/apply: this round's push acts as the apply trigger; if configOk stays false after it, the vars' Scope column must be changed from "Build" to "Deploy" (or "Build and Deploy") in Settings → Variables and Secrets, then Save and deploy.
+- Verification sequence once green: /api/config → configOk:true, /api/market/overview → live price, site → price card + 21-row backfilled track record on first /api/signal/history hit.
