@@ -11,6 +11,13 @@
  * On upstream failure (429 / 5xx / network) the last good value is served
  * with `stale: true` instead of erroring — market data may lag, it never
  * disappears. Only the very first fetch (no cache at all) can hard-fail.
+ *
+ * R34 hardening for Cloudflare Workers egress IPs (shared, intermittently
+ * soft-limited by GeckoTerminal):
+ *   4. One short retry on 429/5xx — rides out transient rejections
+ *   5. Payload validation — a 200 with an empty/degraded body (all-null
+ *      attributes, no candles) is treated as a failure, so an empty payload
+ *      can never poison the cache and be served as "$0.00".
  */
 
 import { marketConfig } from '@/lib/config'
@@ -142,12 +149,22 @@ async function fetchCached<T>(
 }
 
 async function gecko<T>(path: string): Promise<T> {
-  const res = await fetch(`${marketConfig.baseUrl}${path}`, {
-    headers: { Accept: 'application/json' },
-    // Next.js fetch cache disabled — we manage caching ourselves.
-    cache: 'no-store',
-    signal: AbortSignal.timeout(15_000),
-  })
+  const url = `${marketConfig.baseUrl}${path}`
+  const doFetch = () =>
+    fetch(url, {
+      headers: { Accept: 'application/json' },
+      // Next.js fetch cache disabled — we manage caching ourselves.
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15_000),
+    })
+  let res = await doFetch()
+  // GeckoTerminal intermittently rejects requests from datacenter egress IPs
+  // (the Worker's shared IP is hot). One 400ms-backoff retry absorbs the
+  // transient window without breaking the 15s abort budget (R34).
+  if (res.status === 429 || res.status >= 500) {
+    await new Promise((r) => setTimeout(r, 400))
+    res = await doFetch()
+  }
   if (!res.ok) {
     throw new Error(`GeckoTerminal ${path} failed: ${res.status}`)
   }
@@ -188,6 +205,14 @@ async function fetchOverview(): Promise<MarketOverview> {
     : penguIsQuote
       ? Number(a.quote_token_price_usd ?? 0)
       : Number(a.quote_token_price_usd ?? a.base_token_price_usd ?? 0)
+
+  // Payload validation (R34): GeckoTerminal sometimes answers 200 with an
+  // empty/degraded body when soft-limiting datacenter IPs. A real pool always
+  // has a positive price — anything else is a failure, so the stale-serving
+  // layer keeps the last good snapshot instead of caching "$0.00".
+  if (!(penguPriceUsd > 0)) {
+    throw new Error(`GeckoTerminal overview payload empty for pool ${marketConfig.pool}`)
+  }
 
   return {
     priceUsd: penguPriceUsd,
@@ -241,6 +266,11 @@ async function fetchCandles(tf: Timeframe, limit: number): Promise<Candle[]> {
       `?aggregate=${aggregate}&limit=${limit}&currency=usd`
   )
   const list: Array<Array<number>> = json?.data?.attributes?.ohlcv_list ?? []
+  // Payload validation (R34): an empty candle list for a live pool means the
+  // upstream soft-limited us — never cache or serve it as "no data".
+  if (list.length === 0) {
+    throw new Error(`GeckoTerminal ohlcv/${timeframe} returned no candles`)
+  }
   return list
     .map((row) => ({
       time: Number(row[0]),

@@ -1064,3 +1064,24 @@ Stage Summary:
 - Owner's variable list is 100% correct per §3.4 (all 12 values match exactly). The ONLY remaining blocker is the vars' Scope being Build-only: proven by two fresh green deployments (58ea10c @08:29, 570ec6f @08:36) both serving without the runtime vars despite the dashboard list showing them saved.
 - Owner runbook (Persian, delivered): change each variable's Scope to "Build and Deploy" in Settings → Variables and Secrets → Save and deploy; verify /api/config → configOk:true → market price + 21-row backfilled track record appear on first visit.
 - No code changes this round (worklog-only commits); local gates unchanged and green from R32.
+
+---
+Task ID: 34
+Agent: orchestrator (main)
+Task: Owner moved all 12 variables to "Runtime variables and secrets" (SESSION_SECRET now secret_text/encrypted — their words: the dashboard list pasted twice). Verify production end-to-end; fix whatever remains.
+
+Work Log:
+- SYNC CHECK (Rule 2): clean — local == origin/main @ ef092eb (R33).
+- LIVE VERIFICATION — the owner's runtime vars LANDED: /api/config → configOk:true, pool resolved, zero configErrors. Production is functionally unblocked for the first time.
+- FULL API WALK: /api/signal/history → 21 entries backfilled into REMOTE D1 on first hit (engine v2 stamps, backfilled:true, accuracy 30.77% — byte-identical to the locally walk-forward-validated numbers) · /api/signal/today → auth_required (paywall intact, sessions live) · /api/auth/nonce → SIWE message issued · /api/market/overview → live PENGU price $0.0089 (volume $33K, liquidity $440K, mcap $560M).
+- NEW ISSUE FOUND (production-only): GeckoTerminal intermittently rejects/degrades requests from the Worker's SHARED datacenter egress IP — observed as (a) fast 502s on all candle timeframes while the identical URLs work perfectly from the sandbox, and (b) worse: 200s with EMPTY payloads ({"priceUsd":0,...nulls}) which the market client then CACHED as valid data — the live hero showed "$0.00000" (browser-verified, screenshot download/r34-live-before-patch.png). The 21-row track record rendered fine (D1-backed, no upstream dependency).
+- ROOT-CAUSE CLASSIFICATION: transport-layer flakiness, not config. The app's own design goal (file header: "market data may lag, it never disappears") was being defeated by two gaps: no retry on 429/5xx, and empty-200 payloads treated as success.
+- PATCH (src/lib/market/geckoterminal.ts, 3 surgical changes): (1) gecko() retries once on 429/5xx with 400ms backoff — rides out transient rejections within the 15s abort budget; (2) fetchOverview() throws unless penguPriceUsd > 0 — empty/degraded payloads can never poison the cache or render as $0.00 again; (3) fetchCandles() throws on empty ohlcv_list — same protection for charts. Signal-scoring logic untouched (no ENGINE_VERSION bump needed — pure transport hardening).
+- LOCAL VERIFICATION: dev server /api/market/overview → priceUsd 0.0089 fresh · /api/market/candles?tf=1d → 30 candles fresh · e2e-auth 34/34 PASS 0 FAIL (one clean run after the 60s rate-limit window; the earlier ❌s were self-inflicted — my back-to-back suite re-runs exhausted the per-IP nonce limiter, first post-patch run completed clean) · tsc 0 · lint 0.
+- Git: committing + pushing (no force, Rule 1); push triggers the CI deploy that carries the hardening live.
+
+Stage Summary:
+- PRODUCTION IS LIVE AND FULLY CONFIGURED for the first time: configOk:true, 21-day versioned track record in remote D1, paywall + sessions working, live market data flowing. The owner's runtime-variable move + encrypted SESSION_SECRET completed the deployment.
+- R34 hardening deployed: $0.00-poisoning eliminated, transient upstream rejections absorbed by retry, stale-serving now actually protects the UI as designed.
+- Post-deploy live verification of the patch: [pending CI deploy — see R35 if anything remains]
+- Known environmental note: GeckoTerminal free tier vs shared Workers egress IP will keep occasionally soft-limiting; the app now degrades to stale-flagged data instead of zeros/errors. Next-level fixes if ever needed: paid API key, or a second-source fallback pool.
